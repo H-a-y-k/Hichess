@@ -14,5 +14,6 @@
         <file>images/black_queen.png</file>
         <file>images/white_king.png</file>
         <file>images/black_king.png</file>
+        <file>images/highlighted_square.png</file>
   </qresource>
 </RCC>

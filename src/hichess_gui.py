@@ -1,27 +1,26 @@
-from PySide2.QtWidgets import QMainWindow, QStackedWidget
-from PySide2.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout
-from PySide2.QtCore import Qt
+import PySide2.QtWidgets as QtWidgets
 from hichess.hichess import BoardWidget
 
-class HiChessGui(QMainWindow):
+
+class HiChessGui(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.scene = QStackedWidget()
+        self.scene = QtWidgets.QStackedWidget()
         self.setCentralWidget(self.scene)
         self.setupMainMenuScene()
         self.setupGameScene()
 
     def setupMainMenuScene(self):
-        menuScene = QWidget()
-        playOfflineButton = QPushButton("Play Offline")
-        playOnlineButton = QPushButton("Play Online")
-        exitButton = QPushButton("Exit")
+        menuScene = QtWidgets.QWidget()
+        playOfflineButton = QtWidgets.QPushButton("Play Offline")
+        playOnlineButton = QtWidgets.QPushButton("Play Online")
+        exitButton = QtWidgets.QPushButton("Exit")
 
         playOfflineButton.clicked.connect(self.playOffline)
         exitButton.clicked.connect(self.close)
 
-        menuSceneLayout = QVBoxLayout()
+        menuSceneLayout = QtWidgets.QVBoxLayout()
         menuSceneLayout.addWidget(playOfflineButton)
         menuSceneLayout.addWidget(playOnlineButton)
         menuSceneLayout.addWidget(exitButton)
@@ -30,11 +29,11 @@ class HiChessGui(QMainWindow):
         self.scene.addWidget(menuScene)
     
     def setupGameScene(self):
-        gameSceneWidget = QWidget()
-        chessBoard = BoardWidget(flipped = False)
-        informationWidget = QWidget()
+        gameSceneWidget = QtWidgets.QWidget()
+        chessBoard = BoardWidget(flipped=False)
+        informationWidget = QtWidgets.QWidget()
 
-        gameSceneLayout = QHBoxLayout()
+        gameSceneLayout = QtWidgets.QHBoxLayout()
         gameSceneLayout.addWidget(chessBoard)
         gameSceneLayout.addWidget(informationWidget)
         gameSceneLayout.setContentsMargins(0, 0, 0, 0)
