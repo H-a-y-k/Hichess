@@ -1,7 +1,6 @@
 import PySide2.QtWidgets as QtWidgets
 from hichess.hichess import BoardWidget
 
-
 class HiChessGui(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()

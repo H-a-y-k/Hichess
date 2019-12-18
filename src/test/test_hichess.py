@@ -4,14 +4,8 @@ from PySide2.QtWidgets import QApplication, QWidget
 import sys
 import chess
 
-class WidgetTestCase(unittest.TestCase):
-    def setUp(self):
-        self.app = QApplication(sys.argv)
 
-    def tearDown(self):
-        sys.exit(self.app.exec_())
-
-class SquareWidgetTestCase(WidgetTestCase):
+class SquareWidgetTestCase(unittest.TestCase):
     def testParameterValidity(self):
         invalidSquare = 100
         with self.assertRaises(ValueError):
@@ -26,22 +20,23 @@ class SquareWidgetTestCase(WidgetTestCase):
             w.square = invalidSquare
 
 
-class PieceWidgetTestCase(WidgetTestCase):
+class PieceWidgetTestCase(unittest.TestCase):
     def testEquality(self):
-        w1 = hichess.PieceWidget(chess.PAWN, chess.A2)
-        w2 = hichess.PieceWidget(chess.PAWN, chess.A2)
+        w1 = hichess.PieceWidget(chess.A2, chess.Piece(chess.PAWN, chess.WHITE))
+        w2 = hichess.PieceWidget(chess.A2, chess.Piece(chess.PAWN, chess.WHITE))
         self.assertEqual(w1, w2)
 
     def testTransformation(self):
-        w = hichess.PieceWidget(chess.KING, chess.A2)
-        w.transformInto(chess.PAWN)
-        self.assertEqual(w.piece, chess.PAWN)
+        w = hichess.PieceWidget(chess.A2, chess.Piece(chess.PAWN, chess.WHITE))
+        w.transformInto(chess.Piece(chess.PAWN, chess.WHITE))
+        self.assertEqual(w.piece, chess.Piece(chess.PAWN, chess.WHITE))
 
 
-class BoardLayoutTestCase(WidgetTestCase):
-    def testClearTemporaryWidgets(self):
-        layout = hichess.BoardLayout(parent=QWidget())
-        layout.addTemporaryWidget(QWidget())
-        layout.addTemporaryWidget(QWidget())
-if __name__ == '__main__':
+class BoardLayoutTestCase(unittest.TestCase):
+    def testDeleteWidgets(self):
+        pass
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
     unittest.main()
+    sys.exit(app.exec_())
