@@ -1,7 +1,9 @@
 import PySide2.QtWidgets as QtWidgets
-from hichess.hichess import BoardWidget
+import hichess.hichess
+import logging
 
-class HiChessGui(QtWidgets.QMainWindow):
+
+class HichessGui(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -29,7 +31,8 @@ class HiChessGui(QtWidgets.QMainWindow):
     
     def setupGameScene(self):
         gameSceneWidget = QtWidgets.QWidget()
-        chessBoard = BoardWidget(flipped=False)
+        chessBoard = hichess.hichess.BoardWidget(flipped=False)
+
         informationWidget = QtWidgets.QWidget()
 
         gameSceneLayout = QtWidgets.QHBoxLayout()
