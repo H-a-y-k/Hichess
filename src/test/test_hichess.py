@@ -73,6 +73,14 @@ class BoardWidgetTestCase(unittest.TestCase):
     def setUp(self):
         self.boardWidget = hichess.BoardWidget(fen=None)
 
+    def testPieceWidgetAt(self):
+        pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
+
+        self.boardWidget.addPiece(pieceWidget.square, pieceWidget.piece)
+
+        self.assertEqual(pieceWidget, self.boardWidget.pieceWidgetAt(chess.A5))
+        self.assertIsNone(self.boardWidget.pieceWidgetAt(chess.A6))
+
     def testMoveWidget(self):
         pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE), parent=self.boardWidget)
 
@@ -82,6 +90,14 @@ class BoardWidgetTestCase(unittest.TestCase):
 
         self.assertEqual(pieceWidget.square, chess.A6)
         self.assertEqual(pieceWidget.pos().toTuple(), (file * pieceWidget.width(), rank * pieceWidget.height()))
+
+    def testMovePieceWidget(self):
+        pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
+
+        self.boardWidget.movePieceWidget(chess.A6, pieceWidget)
+
+        self.assertEqual(pieceWidget, self.boardWidget.pieceWidgetAt(chess.A6))
+        self.assertIsNone(self.boardWidget.pieceWidgetAt(chess.A5))
 
     def testAddPiece(self):
         piece = chess.Piece(chess.PAWN, chess.WHITE)
@@ -96,21 +112,24 @@ class BoardWidgetTestCase(unittest.TestCase):
                          self.boardWidget.pieceWidgetAt(square))
         self.assertIn(hichess.PieceWidget(square, piece), self.boardWidget.layout().widgets)
 
-    def testMovePieceWidget(self):
-        pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
+    def testSetPieceMap(self):
+        otherBoardWidget = hichess.BoardWidget()
+        self.boardWidget.setPieceMap(otherBoardWidget.board.piece_map())
 
-        self.boardWidget.moveWidget(chess.A6, pieceWidget)
+        self.assertEqual(otherBoardWidget.board.piece_map(), self.boardWidget.board.piece_map())
+        self.assertEqual(otherBoardWidget.board.board_fen(), self.boardWidget.board.board_fen())
+        for w in filter(lambda w: isinstance(w, hichess.PieceWidget), self.boardWidget.layout().widgets):
+            self.assertEqual(w.piece, self.boardWidget.board.piece_at(w.square))
 
-        self.assertEqual(pieceWidget, self.boardWidget.pieceWidgetAt(chess.A6))
-        self.assertIsNone(self.boardWidget.pieceWidgetAt(chess.A5))
+    def testSetFen(self):
+        fen = "r1bqkb1r/ppppppp1/2n2n1p/8/8/5NP1/PPPPPPBP/RNBQK2R w KQkq - 0 4"
+        otherBoardWidget = hichess.BoardWidget(fen=fen)
+        self.boardWidget.setFen(fen)
 
-    def testPieceWidgetAt(self):
-        pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
-
-        self.boardWidget.addPiece(pieceWidget.square, pieceWidget.piece)
-
-        self.assertEqual(pieceWidget, self.boardWidget.pieceWidgetAt(chess.A5))
-        self.assertIsNone(self.boardWidget.pieceWidgetAt(chess.A6))
+        self.assertDictEqual(otherBoardWidget.board.piece_map(), self.boardWidget.board.piece_map())
+        self.assertEqual(otherBoardWidget.board.fen(), self.boardWidget.board.fen())
+        for w in filter(lambda w: isinstance(w, hichess.PieceWidget), self.boardWidget.layout().widgets):
+            self.assertEqual(w.piece, self.boardWidget.board.piece_at(w.square))
 
     def testIsPseudoLegalPromotion(self):
         a = chess.Move(chess.A7, chess.A8)
@@ -135,14 +154,45 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertFalse(self.boardWidget.isPseudoLegalPromotion(d))
         self.assertFalse(self.boardWidget.isPseudoLegalPromotion(e))
 
-    def testPop(self):
+    def testKingsideCastling(self):
+        otherBoard = chess.Board(fen="r1bqkb1r/ppppppp1/2n2n1p/8/8/5NP1/PPPPPPBP/RNBQK2R w KQkq - 0 4")
+        self.boardWidget.setFen(otherBoard.fen())
+        color = chess.WHITE
+        move = chess.Move(chess.E1, chess.G1)
+
+        self.assertTrue(otherBoard.has_kingside_castling_rights(color))
+        self.assertTrue(self.boardWidget.board.has_kingside_castling_rights(color))
+
+        otherBoard.push(move)
+        self.boardWidget.push(move)
+
+        self.assertFalse(otherBoard.has_kingside_castling_rights(color))
+        self.assertFalse(self.boardWidget.board.has_kingside_castling_rights(color))
+        self.assertEqual(otherBoard, self.boardWidget.board)
+
+        otherBoard.pop()
+        self.boardWidget.pop()
+
+        color = chess.BLACK
+        move = chess.Move(chess.square_mirror(move.from_square), chess.square_mirror(move.to_square))
+        otherBoard = otherBoard.mirror()
+        self.boardWidget.setFen(otherBoard.fen())
+
+        self.assertTrue(otherBoard.has_kingside_castling_rights(color))
+        self.assertTrue(self.boardWidget.board.has_kingside_castling_rights(color))
+
+        otherBoard.push(move)
+        self.boardWidget.push(move)
+
+        self.assertFalse(otherBoard.has_kingside_castling_rights(color))
+        self.assertFalse(self.boardWidget.board.has_kingside_castling_rights(color))
+        self.assertEqual(otherBoard, self.boardWidget.board)
+
+    def testQueensideCastling(self):
         pass
 
-    def testPushForKingsideCastling(self):
-        self.boardWidget.setFen("r1bqkbnr/1pp1pppp/p2p4/4n3/4P3/5NP1/PPPP1PBP/RNBQK2R w KQkq - 0 5")
-
-        self.boardWidget.push(chess.Move(chess.E1, chess.G1))
-        self.boardWidget.pop()
+    def testEnPassant(self):
+        pass
 
     def testPushForLegalMoves(self):
         self.boardWidget.setFen(chess.Board.starting_fen)
@@ -170,7 +220,16 @@ class BoardWidgetTestCase(unittest.TestCase):
                 for w in filter(lambda w: isinstance(w, hichess.PieceWidget), boardWidget.layout().widgets):
                     self.assertEqual(w.piece, boardWidget.board.piece_at(w.square))
 
+    def testPop(self):
+        pass
+
     def testHighlightLegalMoves(self):
+        pass
+
+    def testFlip(self):
+        pass
+
+    def testSetLayout(self):
         pass
 
 if __name__ == "__main__":
