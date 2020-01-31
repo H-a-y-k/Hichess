@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 
+
 class SquareWidgetTestCase(unittest.TestCase):
     def testProperty(self):
         invalidSquare = 100
@@ -62,7 +63,7 @@ class BoardLayoutTestCase(unittest.TestCase):
         w = boardWidget.layout().widgets[0]
         layout = hichess.BoardLayout(None)
 
-        with self.assertLogs(level=logging.WARN):
+        with self.assertLogs(level=logging.WARNING):
             layout.addWidget(w)
             self.assertNotIn(w, layout.widgets)
 
@@ -97,7 +98,7 @@ class BoardWidgetTestCase(unittest.TestCase):
 
     def tearDown(self):
         for w in self.boardWidget.layout().widgets:
-            self.assertEqual(w, self.boardWidget.pieceWidgetAt(w.square))
+            self.assertEqual(w, self.boardWidget.widgetAt(w.square))
 
     def testPieceWidgetAt(self):
         pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
@@ -323,7 +324,19 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertEqual(self.boardWidget.board, boardCopy)
 
     def testHighlightLegalMoves(self):
-        self.boardWidget.highlightLegalMovesFor(self.boardWidget.pieceWidgetAt(chess.A1))
+        self.boardWidget.setFen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
+
+        pieceWidgets = self.boardWidget.layout().widgets.copy()
+
+        for w in pieceWidgets:
+            self.boardWidget.highlightLegalMovesFor(w)
+            toSquares = [x.to_square for x in self.boardWidget.board.legal_moves if x.from_square == w.square]
+
+            for w in self.boardWidget.layout().widgets:
+                if isinstance(w, hichess.HighlightedSquareWidget):
+                    self.assertIn(w.square, toSquares)
+                    toSquares.remove(w.square)
+            self.boardWidget.deleteHighlightedSquares()
 
     def testFlip(self):
         self.boardWidget.setFen(chess.STARTING_FEN)
@@ -340,7 +353,24 @@ class BoardWidgetTestCase(unittest.TestCase):
             self.assertEqual(w.pos(), boardWidget2.pieceWidgetAt(w.square).pos())
 
     def testSetLayout(self):
-        pass
+        self.boardWidget.setFen(chess.STARTING_FEN)
+        widgets = self.boardWidget.layout().widgets
+        lyt = hichess.BoardLayout()
+        lyt.addWidget(hichess.SquareWidget(chess.A1))
+        lyt.addWidget(hichess.SquareWidget(chess.A2))
+        lyt.addWidget(hichess.SquareWidget(chess.A3))
+
+        for w in widgets:
+            self.assertIs(w.parent(), self.boardWidget)
+
+        self.boardWidget.setLayout(lyt)
+        self.assertIs(self.boardWidget.layout(), lyt)
+        for w in widgets:
+            self.assertIsNone(w.parent())
+
+        self.assertListEqual(lyt.widgets, self.boardWidget.layout().widgets)
+        for w in self.boardWidget.layout().widgets:
+            self.assertIs(w.parent(), self.boardWidget)
 
 
 if __name__ == "__main__":
