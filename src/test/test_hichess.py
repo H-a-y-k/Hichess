@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+#
+# This file is part of the HiChess project.
+# Copyright (C) 2019-2020 Haik Sargsian <haiksargsian6@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import unittest
 
 import hichess.hichess as hichess
@@ -118,15 +136,6 @@ class BoardWidgetTestCase(unittest.TestCase):
 
         self.assertEqual(pieceWidget.square, chess.A6)
         self.assertEqual(pieceWidget.pos().toTuple(), (file * pieceWidget.width(), rank * pieceWidget.height()))
-
-    def testMovePieceWidget(self):
-        pieceWidget = hichess.PieceWidget(chess.A5, chess.Piece(chess.PAWN, chess.WHITE))
-
-        self.boardWidget.layout().addWidget(pieceWidget)
-        self.boardWidget.movePieceWidget(chess.A6, pieceWidget)
-
-        self.assertEqual(pieceWidget, self.boardWidget.pieceWidgetAt(chess.A6))
-        self.assertIsNone(self.boardWidget.pieceWidgetAt(chess.A5))
 
     def testAddPiece(self):
         piece = chess.Piece(chess.PAWN, chess.WHITE)
@@ -288,7 +297,7 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertEqual(otherBoard, self.boardWidget.board)
 
     def testPushForLegalMoves(self):
-        self.boardWidget.setFen(chess.Board.starting_fen)
+        self.boardWidget.setFen(chess.STARTING_FEN)
 
         for game in os.listdir("test/games"):
             with open("test/games/{}".format(game)) as pgn:
@@ -298,7 +307,7 @@ class BoardWidgetTestCase(unittest.TestCase):
                 for w in self.boardWidget.layout().widgets:
                     self.assertEqual(w, hichess.PieceWidget(w.square, self.boardWidget.board.piece_at(w.square)))
 
-            self.boardWidget = hichess.BoardWidget(fen=None)
+            self.boardWidget.setFen(chess.STARTING_FEN)
 
     def testPushForRaises(self):
         boardWidget = hichess.BoardWidget()
@@ -306,8 +315,7 @@ class BoardWidgetTestCase(unittest.TestCase):
         illegalMoves = ["a1d6", "b2b6", "c2d5", "a7a6", "e1g1"]
         for uci in illegalMoves:
             with self.assertRaises(hichess.IllegalMoveError):
-                boardWidget.pushPieceWidget(chess.Move.from_uci(uci).to_square,
-                                            boardWidget.pieceWidgetAt(chess.Move.from_uci(uci).from_square))
+                boardWidget.push(chess.Move.from_uci(uci))
 
             self.assertEqual(boardWidget.board.fen(), chess.Board.starting_fen)
 
