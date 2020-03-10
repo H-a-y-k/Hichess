@@ -100,14 +100,14 @@ class BoardLayoutTestCase(unittest.TestCase):
         self.assertNotIn(w, boardWidget.layout().widgets)
         self.assertIsNone(w.parent())
 
-    def testDeleteWidgets(self):
+    def testFilter(self):
         boardWidget = hichess.BoardWidget()
         self.assertEqual(len(boardWidget.layout().widgets), 32)
-        boardWidget.layout().deleteWidgets()
+        boardWidget.layout().filter()
         self.assertFalse(boardWidget.layout().widgets)
 
         boardWidget = hichess.BoardWidget()
-        boardWidget.layout().deleteWidgets(lambda w: isinstance(w, hichess.PieceWidget) and w.piece.piece_type == chess.PAWN)
+        boardWidget.layout().filter(lambda w: isinstance(w, hichess.PieceWidget) and w.piece.piece_type == chess.PAWN)
         self.assertEqual(len(boardWidget.layout().widgets), 16)
 
 class BoardWidgetTestCase(unittest.TestCase):
