@@ -17,68 +17,48 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import PySide2.QtWidgets as QtWidgets
-import PySide2.QtCore as QtCore
+from PySide2.QtCore import Qt, QRegExp, Slot, Signal
 from PySide2.QtGui import QRegExpValidator
-import PySide2.QtWebSockets as QtWebSockets
-import PySide2.QtNetwork as QtNetwork
+
 import hichess.hichess as hichess
+import client
 
-import logging
 
+class LoginDialog(QtWidgets.QDialog):
+    loginAccepted = Signal(str)
+    loginRejected = Signal()
 
-class Client(QtCore.QObject):
-    UDP_SERVER_PORT = 45454
-    UDP_CLIENT_PORT = 45455
-
-    def __init__(self, username, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.udpClient = QtNetwork.QUdpSocket(self)
-        self.webClient = QtWebSockets.QWebSocket(
-            "", QtWebSockets.QWebSocketProtocol.VersionLatest, self)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
 
-        self.udpClient.readyRead.connect(self.processPendingDatagrams)
-        self.webClient.connected.connect(self.onConnected)
-        self.webClient.textMessageReceived.connect(self.onTextMessageReceived)
+        titleLabel = QtWidgets.QLabel("LOGIN")
 
-        interfaces = QtNetwork.QNetworkInterface.allInterfaces()
-        for interface in interfaces:
-            if (interface.isValid() and
-                    not interface.flags() & QtNetwork.QNetworkInterface.IsLoopBack and
-                    not interface.flags() & QtNetwork.QNetworkInterface.IsPointToPoint and
-                    interface.flags() & QtNetwork.QNetworkInterface.IsUp and
-                    interface.flags() & QtNetwork.QNetworkInterface.IsRunning):
-                addresses = interface.addressEntries()
-                for address in addresses:
-                    if (not address.ip().isNull() and
-                            not address.ip().isLoopback() and
-                            address.ip().protocol() == QtNetwork.QAbstractSocket.IPv4Protocol and
-                            not address.broadcast().isNull()):
-                        logging.debug(f"Address: {str(address.broadcast())}")
-                        self.udpClient.bind(address.ip(), self.UDP_CLIENT_PORT,
-                                            QtNetwork.QUdpSocket.ShareAddress)
-                        self.udpClient.writeDatagram(QtCore.QByteArray("User = {}".format(username).encode()),
-                                                     address.broadcast(), self.UDP_SERVER_PORT)
-                        return
+        self.usernameLineEdit = QtWidgets.QLineEdit()
+        self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
+        nameRx = QRegExp("[A-Za-z0-9_]{6,15}")
+        self.usernameLineEdit.setValidator(QRegExpValidator(nameRx))
 
-    @QtCore.Slot()
-    def processPendingDatagrams(self):
-        socket = self.sender()
-        logging.debug("Processing datagrams...")
-        while socket and socket.hasPendingDatagrams():
-            datagram = socket.receiveDatagram()
-            logging.debug(datagram.data())
-            logging.debug(datagram.data().startsWith(b"ws://"))
-            if datagram.data().startsWith(b"ws://"):
-                self.webClient.open(QtCore.QUrl.fromEncoded(datagram.data()))
+        rememberMeCheckBox = QtWidgets.QCheckBox("Remember me")
+        loginButton = QtWidgets.QPushButton("Login")
+        loginButton.clicked.connect(self.loginButtonClicked)
+        cancelButton = QtWidgets.QPushButton("Cancel")
+        cancelButton.clicked.connect(self.loginRejected.emit)
 
-    @QtCore.Slot()
-    def onConnected(self):
-        logging.debug("Web client connected to server")
+        layout = QtWidgets.QFormLayout()
+        layout.addRow(titleLabel)
+        layout.addRow(self.usernameLineEdit)
+        layout.addRow(rememberMeCheckBox)
+        layout.addRow(cancelButton, loginButton)
+        layout.setAlignment(titleLabel, Qt.AlignCenter)
+        self.setLayout(layout)
 
-    @QtCore.Slot()
-    def onTextMessageReceived(self, mes):
-        logging.debug(mes)
+    @Slot()
+    def loginButtonClicked(self):
+        self.loginAccepted.emit(self.usernameLineEdit.text())
+        self.close()
+
 
 class HichessGui(QtWidgets.QMainWindow):
     def __init__(self):
@@ -125,21 +105,20 @@ class HichessGui(QtWidgets.QMainWindow):
     def playOffline(self):
         self.scene.setCurrentIndex(1)
 
-    @QtCore.Slot()
-    def connectToServer(self, username):
-        self.client = Client(username, self)
-
     def playOnline(self):
-        loginDialog = QtWidgets.QDialog(self)
-        loginDialogLayout = QtWidgets.QVBoxLayout()
-
-        nameEdit = QtWidgets.QLineEdit()
-        nameRx = QtCore.QRegExp("[A-Za-z0-9_]{6,15}")
-        nameEdit.setValidator(QRegExpValidator(nameRx))
-
-        nameEdit.returnPressed.connect(lambda: (self.connectToServer(nameEdit.text())))
-
-        loginDialogLayout.addWidget(nameEdit)
-        loginDialog.setLayout(loginDialogLayout)
-
+        loginDialog = LoginDialog()
+        loginDialog.loginRejected.connect(loginDialog.reject)
+        loginDialog.loginAccepted.connect(self.connectToServer)
         loginDialog.exec_()
+
+    @Slot()
+    def startGame(self, username):
+        self.scene.setCurrentIndex(1)
+        self.setWindowTitle(username)
+
+    @Slot()
+    def connectToServer(self, username):
+        if self.client is not None:
+            self.client.webClient.close()
+        self.client = client.Client(username, self)
+        self.client.gameStarted.connect(self.startGame)
