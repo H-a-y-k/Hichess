@@ -1,1 +1,1 @@
-# HiChess
+# HiChess [DEMO]
