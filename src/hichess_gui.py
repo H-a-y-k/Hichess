@@ -18,7 +18,7 @@
 
 import PySide2.QtWidgets as QtWidgets
 from PySide2.QtCore import Qt, QRegExp, Slot, Signal
-from PySide2.QtGui import QRegExpValidator
+from PySide2.QtGui import QRegExpValidator, QPixmap
 
 import hichess.hichess as hichess
 import client
@@ -92,7 +92,8 @@ class HichessGui(QtWidgets.QMainWindow):
     def setupGameScene(self):
         gameSceneWidget = QtWidgets.QWidget()
         chessBoard = hichess.BoardWidget(flipped=False)
-
+        chessBoard.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
+                                  flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
         informationWidget = QtWidgets.QWidget()
 
         gameSceneLayout = QtWidgets.QHBoxLayout()

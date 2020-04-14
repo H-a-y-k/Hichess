@@ -1,0 +1,68 @@
+CellWidget {
+    background: transparent;
+    background-repeat: no-repeat;
+    background-position: center center;
+    border: 1px solid white;
+    border: none;
+    border-top: 1px solid white;
+}
+
+CellWidget:checked {
+    background-color: lightgreen;
+}
+
+CellWidget[highlighted=true] {
+    background-color: darkgreen;
+}
+
+CellWidget[highlighted=false] {
+    border: none;
+}
+
+#white_pawn {
+    background-image: url(:/images/white_pawn.png) 2 2 2 2 stretch stretch;
+}
+
+#black_pawn {
+    background-image: url(:/images/black_pawn.png) 2 2 2 2 stretch stretch;
+}
+
+#white_rook {
+    background-image: url(:/images/white_rook.png) 2 2 2 2 stretch stretch;
+}
+
+#black_rook {
+    background-image: url(:/images/black_rook.png) 2 2 2 2 stretch stretch;
+}
+
+#white_knight {
+    background-image: url(:/images/white_knight.png) 2 2 2 2 stretch stretch;
+}
+
+#black_knight {
+    background-image: url(:/images/black_knight.png) 2 2 2 2 stretch stretch;
+}
+
+#white_bishop {
+    background-image: url(:/images/white_bishop.png) 2 2 2 2 stretch stretch;
+}
+
+#black_bishop {
+    background-image: url(:/images/black_bishop.png) 2 2 2 2 stretch stretch;
+}
+
+#white_king {
+    background-image: url(:/images/white_king.png) 2 2 2 2 stretch stretch;
+}
+
+#black_king {
+    background-image: url(:/images/black_king.png) 2 2 2 2 stretch stretch;
+}
+
+#white_queen {
+    background-image: url(:/images/white_queen.png) 2 2 2 2 stretch stretch;
+}
+
+#black_queen {
+    background-image: url(:/images/black_queen.png) 2 2 2 2 stretch stretch;
+}
