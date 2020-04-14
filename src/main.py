@@ -11,11 +11,13 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     window = HichessGui()
+
     f = QFile(":/style/styles.css")
     ts = QTextStream(f)
     if f.open(QFile.ReadOnly):
-        a = str(ts.readAll())
-        app.setStyleSheet(a)
+        app.setStyleSheet(ts.readAll())
+
     window.setMinimumSize(800, 800)
     window.showMaximized()
+
     sys.exit(app.exec_())
