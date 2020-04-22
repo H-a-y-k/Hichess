@@ -21,6 +21,7 @@ from PySide2.QtCore import Qt, QRegExp, Slot, Signal
 from PySide2.QtGui import QRegExpValidator, QPixmap
 
 import hichess.hichess as hichess
+import chess
 import client
 
 
@@ -67,6 +68,10 @@ class HichessGui(QtWidgets.QMainWindow):
         self.client = None
 
         self.scene = QtWidgets.QStackedWidget()
+        self.chessBoard = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
+        self.chessBoard.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
+                                       flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
+
         self.setCentralWidget(self.scene)
         self.setupMainMenuScene()
         self.setupGameScene()
@@ -91,13 +96,11 @@ class HichessGui(QtWidgets.QMainWindow):
 
     def setupGameScene(self):
         gameSceneWidget = QtWidgets.QWidget()
-        chessBoard = hichess.BoardWidget(flipped=False)
-        chessBoard.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
-                                  flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
+
         informationWidget = QtWidgets.QWidget()
 
         gameSceneLayout = QtWidgets.QHBoxLayout()
-        gameSceneLayout.addWidget(chessBoard)
+        gameSceneLayout.addWidget(self.chessBoard)
         gameSceneLayout.addWidget(informationWidget)
         gameSceneLayout.setContentsMargins(0, 0, 0, 0)
         gameSceneWidget.setLayout(gameSceneLayout)
@@ -113,13 +116,24 @@ class HichessGui(QtWidgets.QMainWindow):
         loginDialog.exec_()
 
     @Slot()
-    def startGame(self, username):
+    def startGame(self, packet: client.Packet):
         self.scene.setCurrentIndex(1)
-        self.setWindowTitle(username)
+
+        if packet.contentType == client.WHITE_PLAYER_DATA:
+            self.chessBoard.setAccessibleSides(hichess.ONLY_WHITE_SIDE)
+        elif packet.contentType == client.BLACK_PLAYER_DATA:
+            self.chessBoard.setAccessibleSides(hichess.ONLY_BLACK_SIDE)
+            self.chessBoard.flip()
 
     @Slot()
     def connectToServer(self, username):
         if self.client is not None:
             self.client.webClient.close()
+
         self.client = client.Client(username, self)
         self.client.gameStarted.connect(self.startGame)
+        self.client.moveMade.connect(lambda move: self.chessBoard.movePieceAt(chess.Move.from_uci(move).from_square,
+                                                                              chess.Move.from_uci(move).to_square))
+        self.chessBoard.moveMade.connect(lambda move: self.client.sendPacket(client.MOVE, move))
+
+        self.setWindowTitle(username)

@@ -1,4 +1,5 @@
 CellWidget {
+    border: none;
     background: transparent;
     background-repeat: no-repeat;
     background-position: center center;
@@ -11,16 +12,32 @@ CellWidget:!checked {
 }
 
 CellWidget:checked {
-    background-color: lightgreen;
+    background-color: rgba(110, 155, 100, 0.7);
 }
 
-CellWidget[highlighted=true] {
-    background-color: darkgreen;
+CellWidget[highlighted=true][piece=false] {
+    background-color: rgba(175, 165, 220, 0.6);
 }
 
-CellWidget[highlighted=false] {
-    border: none;
+CellWidget[highlighted=true][piece=false]:hover {
+    background-color: rgba(175, 165, 220, 0.8);
 }
+
+CellWidget[highlighted=true][piece=true] {
+    background-color: rgba(245, 145, 140, 0.6);
+}
+
+CellWidget[highlighted=true][piece=true]:hover {
+    background-color: rgba(245, 145, 140, 0.8);
+}
+
+CellWidget[highlighted=false] {}
+
+CellWidget[marked=true] {
+    background-color: rgba(35, 175, 75, 0.7);
+}
+
+CellWidget[marked=false] {}
 
 #cell_white_pawn {
     background-image: url(:/images/white_pawn.png) 2 2 2 2 stretch stretch;
