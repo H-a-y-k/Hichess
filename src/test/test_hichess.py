@@ -23,6 +23,7 @@ import chess
 import chess.pgn
 
 from PySide2.QtWidgets import QApplication, QSizePolicy
+from PySide2.QtGui import QPixmap
 
 import itertools
 import os
@@ -179,12 +180,24 @@ class CellWidgetTestCase(unittest.TestCase):
 
 class BoardWidgetTestCase(unittest.TestCase):
     def setUp(self):
-        self.boardWidget = hichess.BoardWidget()
+        self.boardWidget = hichess.BoardWidget(fen=chess.STARTING_FEN, flipped=False, sides=hichess.NO_SIDE)
 
     def tearDown(self):
-        pass
-        #for w in self.boardWidget.layout().widgets:
-        #self.assertEqual(w, self.boardWidget.widgetAt(w.square))
+        for i, w in enumerate(self.boardWidget.cellWidgets()):
+            cw = self.boardWidget.cellWidgetAtSquare(self.boardWidget.cellIndexOfSquare(i))
+
+            self.assertEqual(cw.isAccessible, w.isAccessible)
+            self.assertEqual(cw.isPlain(), w.isPlain())
+            self.assertEqual(cw.isPiece(), w.isPiece())
+            self.assertEqual(cw.isCheckable(), w.isCheckable())
+
+            if w.isPiece():
+                colorName, pieceName = cw.objectName().split('_')[1:]
+                pieceType = chess.PIECE_TYPES[chess.PIECE_NAMES.index(pieceName) - 1]
+                self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(cw))
+                                 , chess.Piece(pieceType, colorName == 'white'))
+            else:
+                self.assertFalse(cw.objectName())
 
     def testInit(self):
         pass
@@ -195,23 +208,31 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertListEqual(lytWidgets, list(self.boardWidget.cellWidgets()))
 
     def testCellIndexOfSquare(self):
-        for w in self.boardWidget.cellWidgets():
-            pass
+        for i in range(64):
+            self.assertEqual(self.boardWidget.cellIndexOfSquare(i), chess.square_mirror(i))
+
+        self.boardWidget.flipped = True
+        for i in range(64):
+            self.assertEqual(self.boardWidget.cellIndexOfSquare(i),
+                             chess.square(7 - chess.square_file(i), chess.square_rank(i)))
 
     def testSquareOf(self):
-        pass
+        for i, w in enumerate(self.boardWidget.cellWidgets()):
+            self.assertEqual(self.boardWidget.squareOf(w), chess.square_mirror(i))
+
+        self.boardWidget.flip()
+        for i, w in enumerate(self.boardWidget.cellWidgets()):
+            self.assertEqual(self.boardWidget.squareOf(w),
+                             chess.square(7 - chess.square_file(i), chess.square_rank(i)))
 
     def testCellWidgetAtSquare(self):
-        pass
+        for i, w in enumerate(self.boardWidget.cellWidgets()):
+            self.assertIs(w, self.boardWidget.cellWidgetAtSquare(chess.square_mirror(i)))
 
-    def testUpdatePixmap(self):
-        pass
-
-    def testSetBoardPixmap(self):
-        pass
-
-    def testSetAccessibleSides(self):
-        pass
+        self.boardWidget.flip()
+        for i, w in enumerate(self.boardWidget.cellWidgets()):
+            self.assertIs(w, self.boardWidget.cellWidgetAtSquare(
+                          chess.square(7 - chess.square_file(i), chess.square_rank(i))))
 
     def testCellWidgetClick(self):
         pass
@@ -219,32 +240,116 @@ class BoardWidgetTestCase(unittest.TestCase):
     def testPieceCellWidgetToggle(self):
         pass
 
-    def testSetPieceAt(self):
+    def testCellWidgetMark(self):
         pass
+
+    def testSetPieceAt(self):
+        self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.WHITE))
+        w = self.boardWidget.cellWidgetAtSquare(chess.A4)
+        self.assertFalse(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertFalse(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_white_pawn")
+
+        self.boardWidget = hichess.BoardWidget(sides=hichess.ONLY_WHITE_SIDE)
+        self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.WHITE))
+        w = self.boardWidget.cellWidgetAtSquare(chess.A4)
+        self.assertTrue(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertTrue(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_white_pawn")
+
+        self.boardWidget = hichess.BoardWidget(fen=chess.STARTING_FEN,
+                                               sides=hichess.ONLY_BLACK_SIDE)
+        self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.WHITE))
+        w = self.boardWidget.cellWidgetAtSquare(chess.A4)
+        self.assertFalse(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertFalse(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_white_pawn")
+
+        self.boardWidget = hichess.BoardWidget(sides=hichess.ONLY_BLACK_SIDE)
+        self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.BLACK))
+        w = self.boardWidget.cellWidgetAtSquare(chess.A4)
+        self.assertTrue(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertTrue(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_black_pawn")
+
+        self.boardWidget = hichess.BoardWidget(sides=hichess.BOTH_SIDES)
+        self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.BLACK))
+        w = self.boardWidget.cellWidgetAtSquare(chess.A4)
+        self.assertTrue(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertTrue(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_black_pawn")
 
     def testRemovePieceAt(self):
-        pass
+        self.boardWidget.removePieceAt(chess.A2)
+        w = self.boardWidget.cellWidgetAtSquare(chess.A2)
+        self.assertTrue(w.isPlain())
+        self.assertFalse(w.isPiece())
+        self.assertFalse(w.isCheckable())
+        self.assertIsNone(self.boardWidget.board.piece_at(chess.A2))
 
-    def testAddPiece(self):
-        #piece = chess.Piece(chess.PAWN, chess.WHITE)
-        #square = chess.A5
+        with self.assertRaises(ValueError):
+            self.boardWidget.removePieceAt(chess.A2)
 
-        #self.boardWidget.addPiece(square, piece)
+        for square in range(chess.A3, chess.H5):
+            with self.assertRaises(ValueError):
+                self.boardWidget.removePieceAt(square)
 
-        #with self.assertRaises(ValueError):
-            #self.boardWidget.addPiece(square, piece)
+    def testAddPieceAt(self):
+        square = chess.A5
+        piece = chess.Piece(chess.PAWN, chess.WHITE)
 
-        # INCOMPLETE
-        pass
+        w = self.boardWidget.addPieceAt(square, piece)
+        self.assertFalse(w.isAccessible)
+        self.assertTrue(w.isPiece())
+        self.assertFalse(w.isHighlighted())
+        self.assertFalse(w.isMarked())
+        self.assertFalse(w.isCheckable())
+        self.assertEqual(w.objectName(), "cell_white_pawn")
 
-    def testSynchronizeBoard(self):
-        pass
+        with self.assertRaises(ValueError):
+            self.boardWidget.addPieceAt(square, piece)
+
+    def testSynchronize(self):
+        self.boardWidget = hichess.BoardWidget(fen=None)
+        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
+
+        self.boardWidget.board.set_fen(chess.STARTING_FEN)
+        self.boardWidget.synchronize()
+
+        self.assertEqual(self.boardWidget.board.fen(), chess.Board.starting_fen)
+        self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
 
     def testSetPieceMap(self):
-        pass
+        self.boardWidget = hichess.BoardWidget(fen=None)
+        self.assertFalse(self.boardWidget.board.piece_map())
+
+        newPieceMap = chess.Board().piece_map()
+        self.boardWidget.setPieceMap(newPieceMap)
+        self.assertDictEqual(self.boardWidget.board.piece_map(), newPieceMap)
 
     def testFen(self):
-        pass
+        self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
+
+        self.boardWidget.setFen(None)
+        self.assertFalse(self.boardWidget.board.piece_map())
+        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
+
+        self.boardWidget.setFen(chess.STARTING_FEN)
 
     def testIsPseudoLegalPromotion(self):
         self.boardWidget.setFen(None)
@@ -259,10 +364,10 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertFalse(self.boardWidget.isPseudoLegalPromotion(b))
         self.assertFalse(self.boardWidget.isPseudoLegalPromotion(c))
 
-        self.boardWidget.addPiece(chess.A2, chess.Piece(chess.PAWN, chess.BLACK))
-        self.boardWidget.addPiece(chess.A7, chess.Piece(chess.PAWN, chess.WHITE))
-        self.boardWidget.addPiece(chess.B7, chess.Piece(chess.PAWN, chess.BLACK))
-        self.boardWidget.addPiece(chess.C7, chess.Piece(chess.ROOK, chess.WHITE))
+        self.boardWidget.addPieceAt(chess.A2, chess.Piece(chess.PAWN, chess.BLACK))
+        self.boardWidget.addPieceAt(chess.A7, chess.Piece(chess.PAWN, chess.WHITE))
+        self.boardWidget.addPieceAt(chess.B7, chess.Piece(chess.PAWN, chess.BLACK))
+        self.boardWidget.addPieceAt(chess.C7, chess.Piece(chess.ROOK, chess.WHITE))
 
         self.assertTrue(self.boardWidget.isPseudoLegalPromotion(a))
         self.assertTrue(self.boardWidget.isPseudoLegalPromotion(b))
@@ -272,47 +377,61 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertFalse(self.boardWidget.isPseudoLegalPromotion(e))
 
     def testMovePieceAt(self):
-        pass
+        for gameName in os.listdir("test/games"):
+            with open(f"test/games/{gameName}") as pgn:
+                game = chess.pgn.read_game(pgn)
+                self.boardWidget = hichess.BoardWidget(fen=game.board().fen(),
+                                                       flipped=False, sides=hichess.NO_SIDE)
+                for move in game.mainline_moves():
+                    self.boardWidget.movePieceAt(move.from_square, move.to_square)
+                    w = self.boardWidget.cellWidgetAtSquare(move.to_square)
+
+                    self.assertTrue(w.isPiece())
+                    colorName, pieceName = w.objectName().split('_')[1:]
+                    pieceType = chess.PIECE_TYPES[chess.PIECE_NAMES.index(pieceName) - 1]
+                    self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(w)),
+                                     chess.Piece(pieceType, colorName == 'white'))
 
     def testMovePiece(self):
-        pass
+        for gameName in os.listdir("test/games"):
+            with open(f"test/games/{gameName}") as pgn:
+                game = chess.pgn.read_game(pgn)
+                self.boardWidget = hichess.BoardWidget(fen=game.board().fen(),
+                                                       flipped=False, sides=hichess.NO_SIDE)
+                for move in game.mainline_moves():
+                    self.boardWidget.movePiece(move.to_square,
+                                               self.boardWidget.cellWidgetAtSquare(move.from_square))
+                    w = self.boardWidget.cellWidgetAtSquare(move.to_square)
 
-    def testPushPiece(self):
-        pass
+                    self.assertTrue(w.isPiece())
+                    colorName, pieceName = w.objectName().split('_')[1:]
+                    pieceType = chess.PIECE_TYPES[chess.PIECE_NAMES.index(pieceName) - 1]
+                    self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(w)),
+                                     chess.Piece(pieceType, colorName == 'white'))
 
-    def testPushForLegalMoves(self):
-        """
-        self.boardWidget.setFen(chess.STARTING_FEN)
-
-        for game in os.listdir("test/games"):
-            with open("test/games/{}".format(game)) as pgn:
-                for move in chess.pgn.read_game(pgn).mainline_moves():
+    def testPush(self):
+        for gameName in os.listdir("test/games"):
+            with open(f"test/games/{gameName}") as pgn:
+                game = chess.pgn.read_game(pgn)
+                self.boardWidget = hichess.BoardWidget(fen=game.board().fen(),
+                                                       flipped=False, sides=hichess.NO_SIDE)
+                for move in game.mainline_moves():
                     self.boardWidget.push(move)
+                    w = self.boardWidget.cellWidgetAtSquare(move.to_square)
 
-                for w in self.boardWidget.layout().widgets:
-                    pass
-                    #self.assertEqual(w, hichess.PieceWidget(w.square, self.boardWidget.board.piece_at(w.square)))
-
-            self.boardWidget.setFen(chess.STARTING_FEN)
-        """
-        pass
+                    self.assertTrue(w.isPiece())
+                    colorName, pieceName = w.objectName().split('_')[1:]
+                    pieceType = chess.PIECE_TYPES[chess.PIECE_NAMES.index(pieceName) - 1]
+                    self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(w)),
+                                     chess.Piece(pieceType, colorName == 'white'))
 
     def testPushForRaises(self):
-        """
         boardWidget = hichess.BoardWidget()
 
         illegalMoves = ["a1d6", "b2b6", "c2d5", "a7a6", "e1g1"]
         for uci in illegalMoves:
             with self.assertRaises(hichess.IllegalMove):
                 boardWidget.push(chess.Move.from_uci(uci))
-
-            self.assertEqual(boardWidget.board.fen(), chess.Board.starting_fen)
-
-            for w in boardWidget.layout().widgets:
-                #self.assertEqual(w, hichess.PieceWidget(w.square, boardWidget.board.piece_at(w.square)))
-                pass
-        """
-        pass
 
     def testPop(self):
         """
@@ -328,7 +447,6 @@ class BoardWidgetTestCase(unittest.TestCase):
 
     def testHighlightLegalMoveCellsFor(self):
         self.boardWidget.setFen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
-        pass
 
     def testUnhighlightCells(self):
         pass
@@ -349,6 +467,10 @@ class BoardWidgetTestCase(unittest.TestCase):
             self.assertEqual(w.pos(), boardWidget2.pieceWidgetAt(w.square).pos())
         """
         pass
+
+    def testSetAccessibleSides(self):
+        pass
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
