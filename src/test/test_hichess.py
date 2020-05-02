@@ -17,13 +17,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
+from unittest.mock import patch
 
 import hichess.hichess as hichess
 import chess
 import chess.pgn
 
 from PySide2.QtWidgets import QApplication, QSizePolicy
-from PySide2.QtGui import QPixmap
 
 import itertools
 import os
@@ -186,21 +186,50 @@ class BoardWidgetTestCase(unittest.TestCase):
         for i, w in enumerate(self.boardWidget.cellWidgets()):
             cw = self.boardWidget.cellWidgetAtSquare(self.boardWidget.cellIndexOfSquare(i))
 
-            self.assertEqual(cw.isAccessible, w.isAccessible)
             self.assertEqual(cw.isPlain(), w.isPlain())
             self.assertEqual(cw.isPiece(), w.isPiece())
             self.assertEqual(cw.isCheckable(), w.isCheckable())
+            self.assertEqual(cw.isAccessible, w.isAccessible)
 
             if w.isPiece():
                 colorName, pieceName = cw.objectName().split('_')[1:]
                 pieceType = chess.PIECE_TYPES[chess.PIECE_NAMES.index(pieceName) - 1]
-                self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(cw))
-                                 , chess.Piece(pieceType, colorName == 'white'))
+                self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(cw)),
+                                 chess.Piece(pieceType, colorName == 'white'))
             else:
                 self.assertFalse(cw.objectName())
 
     def testInit(self):
-        pass
+        boardWidgetCopy = self.boardWidget
+
+        self.assertEqual(self.boardWidget.board.fen(), chess.STARTING_FEN)
+        self.assertFalse(self.boardWidget.flipped)
+        self.assertEqual(self.boardWidget.accessibleSides, hichess.NO_SIDE)
+        self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
+        self.assertEqual(len(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets()))), 32)
+        self.assertEqual(len(list(filter(lambda w: w.isPlain(), self.boardWidget.cellWidgets()))), 32)
+
+        self.boardWidget = hichess.BoardWidget(fen=None, flipped=False, sides=hichess.NO_SIDE)
+        self.assertEqual(self.boardWidget.board.fen(), chess.Board(None).fen())
+        self.assertFalse(self.boardWidget.flipped)
+        self.assertEqual(self.boardWidget.accessibleSides, hichess.NO_SIDE)
+        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
+        self.assertEqual(len(list(filter(lambda w: w.isPlain(), self.boardWidget.cellWidgets()))), 64)
+
+        self.boardWidget = hichess.BoardWidget(fen=chess.STARTING_FEN, flipped=True, sides=hichess.BOTH_SIDES)
+        self.assertEqual(self.boardWidget.board.fen(), chess.STARTING_FEN)
+        self.assertTrue(self.boardWidget.flipped)
+        self.assertEqual(self.boardWidget.accessibleSides, hichess.BOTH_SIDES)
+
+        for i in range(64):
+            w1 = self.boardWidget.cellWidgetAtSquare(i)
+            w2 = boardWidgetCopy.cellWidgetAtSquare(i)
+
+            self.assertEqual(w1.isPlain(), w2.isPlain())
+            self.assertEqual(w1.isPiece(), w2.isPiece())
+            self.assertEqual(w1.isHighlighted(), w2.isHighlighted())
+            self.assertEqual(w1.isMarked(), w2.isMarked())
+            self.assertEqual(w1.objectName(), w2.objectName())
 
     def testGetCellWidgets(self):
         lyt = self.boardWidget.layout()
@@ -334,22 +363,32 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertEqual(self.boardWidget.board.fen(), chess.Board.starting_fen)
         self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
 
-    def testSetPieceMap(self):
+    @patch("hichess.hichess.BoardWidget.synchronize")
+    def testSetPieceMap(self, mockSynchronize):
         self.boardWidget = hichess.BoardWidget(fen=None)
-        self.assertFalse(self.boardWidget.board.piece_map())
+        mockSynchronize.assert_called_once()
+        mockSynchronize.reset_mock()
 
         newPieceMap = chess.Board().piece_map()
         self.boardWidget.setPieceMap(newPieceMap)
+        mockSynchronize.assert_called_once()
         self.assertDictEqual(self.boardWidget.board.piece_map(), newPieceMap)
 
-    def testFen(self):
-        self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
+    def testSetFen(self):
+        self.assertEqual(self.boardWidget.board.fen(), chess.STARTING_FEN)
 
         self.boardWidget.setFen(None)
+
+        self.assertEqual(self.boardWidget.board.fen(), chess.Board(None).fen())
         self.assertFalse(self.boardWidget.board.piece_map())
         self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
 
-        self.boardWidget.setFen(chess.STARTING_FEN)
+    @patch("hichess.hichess.BoardWidget.unhighlightCells")
+    def testClear(self, mockUnhighlightCells):
+        boardWidget = self.boardWidget
+        boardWidget.clear()
+        mockUnhighlightCells.assert_called_once()
+        self.assertEqual(boardWidget.board, chess.Board(None))
 
     def testIsPseudoLegalPromotion(self):
         self.boardWidget.setFen(None)
@@ -448,28 +487,70 @@ class BoardWidgetTestCase(unittest.TestCase):
     def testHighlightLegalMoveCellsFor(self):
         self.boardWidget.setFen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
 
+    def testUncheckCells(self):
+        self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+
+        def callback(w):
+            if w.isCheckable():
+                w.setChecked(True)
+
+        list(map(callback, self.boardWidget.cellWidgets()))
+        self.boardWidget.uncheckCells(None)
+        self.assertFalse(list(filter(lambda _w: _w.isChecked(), self.boardWidget.cellWidgets())))
+
+        list(map(callback, self.boardWidget.cellWidgets()))
+        for w in self.boardWidget.cellWidgets():
+            if w.isChecked():
+                self.boardWidget.uncheckCells(exceptFor=w)
+                checkedWidgets = list(filter(lambda _w: _w.isChecked(), self.boardWidget.cellWidgets()))
+                self.assertEqual(len(checkedWidgets), 1)
+                self.assertIs(checkedWidgets[0], w)
+                break
+
     def testUnhighlightCells(self):
-        pass
+        self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+
+        list(map(hichess.CellWidget.highlight, self.boardWidget.cellWidgets()))
+        self.boardWidget.unhighlightCells()
+        self.assertFalse(list(filter(hichess.CellWidget.isHighlighted, self.boardWidget.cellWidgets())))
+
+    def testUnmarkCells(self):
+        list(map(hichess.CellWidget.mark, self.boardWidget.cellWidgets()))
+        self.boardWidget.unmarkCells()
+        self.assertFalse(list(filter(hichess.CellWidget.isMarked, self.boardWidget.cellWidgets())))
 
     def testFlip(self):
-        """
-        self.boardWidget.setFen(chess.STARTING_FEN)
-        boardWidget2 = hichess.BoardWidget()
+        boardWidgetCopy = self.boardWidget
+
+        self.boardWidget = hichess.BoardWidget(fen=chess.STARTING_FEN, flipped=False, sides=hichess.BOTH_SIDES)
+
+        for i in range(64):
+            w1 = self.boardWidget.cellWidgetAtSquare(i)
+            w2 = boardWidgetCopy.cellWidgetAtSquare(i)
+
+            self.assertEqual(w1.isPlain(), w2.isPlain())
+            self.assertEqual(w1.isPiece(), w2.isPiece())
+            self.assertEqual(w1.isHighlighted(), w2.isHighlighted())
+            self.assertEqual(w1.isMarked(), w2.isMarked())
+            self.assertEqual(w1.objectName(), w2.objectName())
+
         self.boardWidget.flip()
 
-        self.assertTrue(self.boardWidget.flipped)
-        self.assertEqual(self.boardWidget.board, boardWidget2.board)
-        for w in self.boardWidget.layout().widgets:
-            self.assertEqual(w.pos(), boardWidget2.pieceWidgetAt(chess.square_mirror(w.square)).pos())
+        for i in range(64):
+            w1 = self.boardWidget.cellWidgetAtSquare(i)
+            w2 = boardWidgetCopy.cellWidgetAtSquare(i)
 
-        self.boardWidget.flip()
-        for w in self.boardWidget.layout().widgets:
-            self.assertEqual(w.pos(), boardWidget2.pieceWidgetAt(w.square).pos())
-        """
-        pass
+            self.assertEqual(w1.isPlain(), w2.isPlain())
+            self.assertEqual(w1.isPiece(), w2.isPiece())
+            self.assertEqual(w1.isHighlighted(), w2.isHighlighted())
+            self.assertEqual(w1.isMarked(), w2.isMarked())
+            self.assertEqual(w1.objectName(), w2.objectName())
 
-    def testSetAccessibleSides(self):
-        pass
+    @patch("hichess.hichess.BoardWidget.synchronize")
+    def testSetAccessibleSides(self, mockSynchronize):
+        self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+        self.assertEqual(self.boardWidget.accessibleSides, hichess.BOTH_SIDES)
+        mockSynchronize.assert_called_once()
 
 
 if __name__ == "__main__":

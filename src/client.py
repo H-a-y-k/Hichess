@@ -50,9 +50,8 @@ class Client(QtCore.QObject):
 
         self.webClient.connected.connect(self.authorize)
         self.webClient.binaryMessageReceived.connect(self.processBinaryMessage)
-        self.webClient.error.connect(partial(logging.debug, self.webClient.errorString))
 
-        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.56.1:54545"))
+        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.6:54545"))
 
     @QtCore.Slot()
     def authorize(self):

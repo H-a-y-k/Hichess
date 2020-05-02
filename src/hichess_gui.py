@@ -35,17 +35,25 @@ class LoginDialog(QtWidgets.QDialog):
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
 
         titleLabel = QtWidgets.QLabel("LOGIN")
+        titleLabel.setMinimumHeight(35)
 
         self.usernameLineEdit = QtWidgets.QLineEdit()
         self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
         nameRx = QRegExp("[A-Za-z0-9_]{6,15}")
         self.usernameLineEdit.setValidator(QRegExpValidator(nameRx))
+        self.usernameLineEdit.setMinimumHeight(35)
 
         rememberMeCheckBox = QtWidgets.QCheckBox("Remember me")
+        rememberMeCheckBox.setMinimumHeight(35)
+
         loginButton = QtWidgets.QPushButton("Login")
         loginButton.clicked.connect(self.loginButtonClicked)
+        loginButton.setDefault(True)
+        loginButton.setMinimumHeight(35)
+
         cancelButton = QtWidgets.QPushButton("Cancel")
         cancelButton.clicked.connect(self.loginRejected.emit)
+        cancelButton.setMinimumHeight(35)
 
         layout = QtWidgets.QFormLayout()
         layout.addRow(titleLabel)
@@ -120,9 +128,9 @@ class HichessGui(QtWidgets.QMainWindow):
         self.scene.setCurrentIndex(1)
 
         if packet.contentType == client.WHITE_PLAYER_DATA:
-            self.chessBoard.setAccessibleSides(hichess.ONLY_WHITE_SIDE)
+            self.chessBoard.accessibleSides = hichess.ONLY_WHITE_SIDE
         elif packet.contentType == client.BLACK_PLAYER_DATA:
-            self.chessBoard.setAccessibleSides(hichess.ONLY_BLACK_SIDE)
+            self.chessBoard.accessibleSides = hichess.ONLY_BLACK_SIDE
             self.chessBoard.flip()
 
     @Slot()
