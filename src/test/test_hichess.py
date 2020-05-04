@@ -32,7 +32,7 @@ import sys
 
 class CellWidgetTestCase(unittest.TestCase):
     def setUp(self):
-        self.cellWidget = hichess.CellWidget()
+        self.cellWidget = hichess.CellWidget(parent=None, isAccessible=False)
 
     def testInit(self):
         self.assertTrue(self.cellWidget.isPlain())
@@ -41,46 +41,16 @@ class CellWidgetTestCase(unittest.TestCase):
         self.assertFalse(self.cellWidget.isCheckable())
         self.assertEqual(self.cellWidget.sizePolicy(), QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
 
-    def testIsPlain(self):
-        self.assertTrue(self.cellWidget.isPlain())
-        self.cellWidget.setProperty("plain", False)
-        self.assertFalse(self.cellWidget.isPlain())
-        self.cellWidget.setProperty("plain", True)
-        self.assertTrue(self.cellWidget.isPlain())
-
-    def testSetIsPlain(self):
-        self.assertTrue(self.cellWidget.isPlain())
-        self.cellWidget.setIsPlain(False)
-        self.assertFalse(self.cellWidget.isPlain())
-        self.cellWidget.setIsPlain(True)
-        self.assertTrue(self.cellWidget.isPlain())
-
-    def testToPlain(self):
-        self.cellWidget.isAccessible = True
-
-        self.cellWidget.toPlain()
-        self.assertTrue(self.cellWidget.isPlain())
-        self.assertFalse(self.cellWidget.isAccessible)
-        self.assertFalse(self.cellWidget.isCheckable())
-        self.assertFalse(self.cellWidget.objectName())
-
     def testIsPiece(self):
         self.assertFalse(self.cellWidget.isPiece())
-        self.cellWidget.setIsPiece(True)
+        self.cellWidget.setPiece(chess.Piece(chess.PAWN, chess.BLACK))
         self.assertTrue(self.cellWidget.isPiece())
-        self.cellWidget.setIsPiece(False)
+        self.cellWidget.setPiece(None)
         self.assertFalse(self.cellWidget.isPiece())
 
-    def setIsPiece(self):
-        self.assertFalse(self.cellWidget.isPiece())
-        self.cellWidget.setIsPiece(True)
-        self.assertTrue(self.cellWidget.isPiece())
-        self.cellWidget.setIsPiece(False)
-        self.assertFalse(self.cellWidget.isPiece())
-
-    def testToPiece(self):
+    def testSetPiece(self):
         for pieceType, color in itertools.product(chess.PIECE_TYPES, chess.COLORS):
-            self.cellWidget.toPiece(chess.Piece(pieceType, color))
+            self.cellWidget.setPiece(chess.Piece(pieceType, color))
             self.assertTrue(self.cellWidget.isPiece())
             self.assertFalse(self.cellWidget.isAccessible)
             self.assertFalse(self.cellWidget.isCheckable())
@@ -88,11 +58,56 @@ class CellWidgetTestCase(unittest.TestCase):
 
         self.cellWidget = hichess.CellWidget(isAccessible=True)
         for pieceType, color in itertools.product(chess.PIECE_TYPES, chess.COLORS):
-            self.cellWidget.toPiece(chess.Piece(pieceType, color))
+            self.cellWidget.setPiece(chess.Piece(pieceType, color))
             self.assertTrue(self.cellWidget.isPiece())
             self.assertTrue(self.cellWidget.isAccessible)
             self.assertTrue(self.cellWidget.isCheckable())
             self.assertEqual(self.cellWidget.objectName(), f"cell_{chess.COLOR_NAMES[color]}_{chess.PIECE_NAMES[pieceType]}")
+
+        self.assertTrue(self.cellWidget.isPiece())
+        self.cellWidget.setPiece(None)
+        self.assertFalse(self.cellWidget.isPiece())
+        self.assertEqual(self.cellWidget.objectName(), "cell_plain")
+        self.assertFalse(self.cellWidget.isCheckable())
+
+    def testIsPlain(self):
+        self.assertTrue(self.cellWidget.isPlain())
+        self.cellWidget.setPiece(chess.Piece(chess.PAWN, chess.BLACK))
+        self.assertFalse(self.cellWidget.isPlain())
+        self.cellWidget.setPiece(None)
+        self.assertTrue(self.cellWidget.isPlain())
+
+    @patch("hichess.hichess.CellWidget.setPiece")
+    def testToPlain(self, mockSetPiece):
+        self.cellWidget.toPlain()
+        mockSetPiece.assert_called_with(None)
+
+    def testIsCheckedKing(self):
+        self.assertFalse(self.cellWidget.isCheckedKing())
+        self.cellWidget.setPiece(chess.Piece(chess.KING, chess.WHITE))
+        self.assertFalse(self.cellWidget.isCheckedKing())
+        self.cellWidget.check()
+        self.assertTrue(self.cellWidget.isCheckedKing())
+
+    def testSetIsCheckedKing(self):
+        self.assertFalse(self.cellWidget.setIsCheckedKing(True))
+        self.assertFalse(self.cellWidget.setIsCheckedKing(False))
+
+        self.cellWidget.setPiece(chess.Piece(chess.KING, chess.WHITE))
+        self.assertTrue(self.cellWidget.setIsCheckedKing(True))
+        self.assertTrue(self.cellWidget.isCheckedKing())
+        self.assertTrue(self.cellWidget.setIsCheckedKing(False))
+        self.assertFalse(self.cellWidget.isCheckedKing())
+
+    @patch("hichess.hichess.CellWidget.setIsCheckedKing")
+    def testCheck(self, mockSetIsCheckedKing):
+        self.cellWidget.check()
+        mockSetIsCheckedKing.assert_called_once_with(True)
+
+    @patch("hichess.hichess.CellWidget.setIsCheckedKing")
+    def testUncheck(self, mockSetIsCheckedKing):
+        self.cellWidget.uncheck()
+        mockSetIsCheckedKing.assert_called_once_with(False)
 
     def testIsHighlighted(self):
         self.assertFalse(self.cellWidget.isHighlighted())
@@ -101,32 +116,9 @@ class CellWidgetTestCase(unittest.TestCase):
         self.cellWidget.setProperty("highlighted", False)
         self.assertFalse(self.cellWidget.isHighlighted())
 
-    def testHighlight(self):
-        self.cellWidget = hichess.CellWidget()
-        self.assertFalse(self.cellWidget.isHighlighted())
-        self.cellWidget.highlight()
-        self.assertTrue(self.cellWidget.isHighlighted())
-        self.assertFalse(self.cellWidget.isCheckable())
-
-    def testUnhighlight(self):
-        self.assertFalse(self.cellWidget.isHighlighted())
-        self.cellWidget.highlight()
-        self.assertTrue(self.cellWidget.isHighlighted())
-        self.assertFalse(self.cellWidget.isCheckable())
-
-        self.cellWidget.unhighlight()
-        self.assertFalse(self.cellWidget.isHighlighted())
-        self.assertFalse(self.cellWidget.isCheckable())
-
-        self.cellWidget.isAccessible = True
-        self.cellWidget.unhighlight()
-        self.assertTrue(self.cellWidget.isCheckable())
-
-        self.cellWidget.highlight()
-        self.assertTrue(self.cellWidget.isHighlighted())
-        self.assertFalse(self.cellWidget.isCheckable())
-
     def testSetHighlighted(self):
+        self.cellWidget.isAccessible = True
+
         self.assertFalse(self.cellWidget.isHighlighted())
         self.cellWidget.setHighlighted(True)
         self.assertTrue(self.cellWidget.isHighlighted())
@@ -134,34 +126,27 @@ class CellWidgetTestCase(unittest.TestCase):
 
         self.cellWidget.setHighlighted(False)
         self.assertFalse(self.cellWidget.isHighlighted())
-        self.assertFalse(self.cellWidget.isCheckable())
-
-        self.cellWidget.isAccessible = True
-        self.cellWidget.setHighlighted(False)
         self.assertTrue(self.cellWidget.isCheckable())
 
         self.cellWidget.setHighlighted(True)
         self.assertTrue(self.cellWidget.isHighlighted())
         self.assertFalse(self.cellWidget.isCheckable())
+
+    @patch("hichess.hichess.CellWidget.setHighlighted")
+    def testHighlight(self, mockSetHighlighted):
+        self.cellWidget.highlight()
+        mockSetHighlighted.assert_called_once_with(True)
+
+    @patch("hichess.hichess.CellWidget.setHighlighted")
+    def testUnhighlight(self, mockSetHighlighted):
+        self.cellWidget.unhighlight()
+        mockSetHighlighted.assert_called_once_with(False)
 
     def isMarked(self):
         self.assertFalse(self.cellWidget.isMarked())
         self.cellWidget.setProperty("marked", True)
         self.assertTrue(self.cellWidget.isMarked())
         self.cellWidget.setProperty("marked", False)
-        self.assertFalse(self.cellWidget.isMarked())
-
-    def testMark(self):
-        self.assertFalse(self.cellWidget.isMarked())
-        self.cellWidget.mark()
-        self.assertTrue(self.cellWidget.isMarked())
-
-    def testUnmark(self):
-        self.assertFalse(self.cellWidget.isMarked())
-        self.cellWidget.mark()
-        self.assertTrue(self.cellWidget.isMarked())
-
-        self.cellWidget.unmark()
         self.assertFalse(self.cellWidget.isMarked())
 
     def testSetMarked(self):
@@ -176,6 +161,16 @@ class CellWidgetTestCase(unittest.TestCase):
 
         self.cellWidget.unmark()
         self.assertFalse(self.cellWidget.isMarked())
+
+    @patch("hichess.hichess.CellWidget.setMarked")
+    def testMark(self, mockSetMarked):
+        self.cellWidget.mark()
+        mockSetMarked.assert_called_once_with(True)
+
+    @patch("hichess.hichess.CellWidget.setMarked")
+    def testUnmark(self, mockSetMarked):
+        self.cellWidget.unmark()
+        mockSetMarked.assert_called_once_with(False)
 
 
 class BoardWidgetTestCase(unittest.TestCase):
@@ -197,7 +192,7 @@ class BoardWidgetTestCase(unittest.TestCase):
                 self.assertEqual(self.boardWidget.board.piece_at(self.boardWidget.squareOf(cw)),
                                  chess.Piece(pieceType, colorName == 'white'))
             else:
-                self.assertFalse(cw.objectName())
+                self.assertEqual(cw.objectName(), "cell_plain")
 
     def testInit(self):
         boardWidgetCopy = self.boardWidget
@@ -206,15 +201,15 @@ class BoardWidgetTestCase(unittest.TestCase):
         self.assertFalse(self.boardWidget.flipped)
         self.assertEqual(self.boardWidget.accessibleSides, hichess.NO_SIDE)
         self.assertDictEqual(self.boardWidget.board.piece_map(), chess.Board().piece_map())
-        self.assertEqual(len(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets()))), 32)
-        self.assertEqual(len(list(filter(lambda w: w.isPlain(), self.boardWidget.cellWidgets()))), 32)
+        self.assertEqual(len(list(filter(hichess.CellWidget.isPiece, self.boardWidget.cellWidgets()))), 32)
+        self.assertEqual(len(list(filter(hichess.CellWidget.isPlain, self.boardWidget.cellWidgets()))), 32)
 
         self.boardWidget = hichess.BoardWidget(fen=None, flipped=False, sides=hichess.NO_SIDE)
         self.assertEqual(self.boardWidget.board.fen(), chess.Board(None).fen())
         self.assertFalse(self.boardWidget.flipped)
         self.assertEqual(self.boardWidget.accessibleSides, hichess.NO_SIDE)
-        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
-        self.assertEqual(len(list(filter(lambda w: w.isPlain(), self.boardWidget.cellWidgets()))), 64)
+        self.assertFalse(list(filter(hichess.CellWidget.isPiece, self.boardWidget.cellWidgets())))
+        self.assertEqual(len(list(filter(hichess.CellWidget.isPlain, self.boardWidget.cellWidgets()))), 64)
 
         self.boardWidget = hichess.BoardWidget(fen=chess.STARTING_FEN, flipped=True, sides=hichess.BOTH_SIDES)
         self.assertEqual(self.boardWidget.board.fen(), chess.STARTING_FEN)
@@ -263,14 +258,36 @@ class BoardWidgetTestCase(unittest.TestCase):
             self.assertIs(w, self.boardWidget.cellWidgetAtSquare(
                           chess.square(7 - chess.square_file(i), chess.square_rank(i))))
 
-    def testCellWidgetClick(self):
-        pass
+    def testIsPseudoLegalPromotion(self):
+        self.boardWidget.setFen(None)
 
-    def testPieceCellWidgetToggle(self):
-        pass
+        a = chess.Move(chess.A7, chess.A8)
+        b = chess.Move(chess.A2, chess.A1)
+        c = chess.Move(chess.A3, chess.A4)
+        d = chess.Move(chess.B7, chess.B8)
+        e = chess.Move(chess.C7, chess.C8)
 
-    def testCellWidgetMark(self):
-        pass
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(a))
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(b))
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(c))
+
+        self.boardWidget.addPieceAt(chess.A2, chess.Piece(chess.PAWN, chess.BLACK))
+        self.boardWidget.addPieceAt(chess.A7, chess.Piece(chess.PAWN, chess.WHITE))
+        self.boardWidget.addPieceAt(chess.B7, chess.Piece(chess.PAWN, chess.BLACK))
+        self.boardWidget.addPieceAt(chess.C7, chess.Piece(chess.ROOK, chess.WHITE))
+
+        self.assertTrue(self.boardWidget.isPseudoLegalPromotion(a))
+        self.assertTrue(self.boardWidget.isPseudoLegalPromotion(b))
+
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(c))
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(d))
+        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(e))
+
+    def testKing(self):
+        self.assertEqual(self.boardWidget.squareOf(self.boardWidget.king(chess.WHITE)),
+                         self.boardWidget.board.king(chess.WHITE))
+        self.assertEqual(self.boardWidget.squareOf(self.boardWidget.king(chess.BLACK)),
+                         self.boardWidget.board.king(chess.BLACK))
 
     def testSetPieceAt(self):
         self.boardWidget.setPieceAt(chess.A4, chess.Piece(chess.PAWN, chess.WHITE))
@@ -355,7 +372,7 @@ class BoardWidgetTestCase(unittest.TestCase):
 
     def testSynchronize(self):
         self.boardWidget = hichess.BoardWidget(fen=None)
-        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
+        self.assertFalse(list(filter(hichess.CellWidget.isPiece, self.boardWidget.cellWidgets())))
 
         self.boardWidget.board.set_fen(chess.STARTING_FEN)
         self.boardWidget.synchronize()
@@ -367,11 +384,10 @@ class BoardWidgetTestCase(unittest.TestCase):
     def testSetPieceMap(self, mockSynchronize):
         self.boardWidget = hichess.BoardWidget(fen=None)
         mockSynchronize.assert_called_once()
-        mockSynchronize.reset_mock()
 
         newPieceMap = chess.Board().piece_map()
         self.boardWidget.setPieceMap(newPieceMap)
-        mockSynchronize.assert_called_once()
+        self.assertEqual(mockSynchronize.call_count, 2)
         self.assertDictEqual(self.boardWidget.board.piece_map(), newPieceMap)
 
     def testSetFen(self):
@@ -381,7 +397,7 @@ class BoardWidgetTestCase(unittest.TestCase):
 
         self.assertEqual(self.boardWidget.board.fen(), chess.Board(None).fen())
         self.assertFalse(self.boardWidget.board.piece_map())
-        self.assertFalse(list(filter(lambda w: w.isPiece(), self.boardWidget.cellWidgets())))
+        self.assertFalse(list(filter(hichess.CellWidget.isPiece, self.boardWidget.cellWidgets())))
 
     @patch("hichess.hichess.BoardWidget.unhighlightCells")
     def testClear(self, mockUnhighlightCells):
@@ -389,31 +405,6 @@ class BoardWidgetTestCase(unittest.TestCase):
         boardWidget.clear()
         mockUnhighlightCells.assert_called_once()
         self.assertEqual(boardWidget.board, chess.Board(None))
-
-    def testIsPseudoLegalPromotion(self):
-        self.boardWidget.setFen(None)
-
-        a = chess.Move(chess.A7, chess.A8)
-        b = chess.Move(chess.A2, chess.A1)
-        c = chess.Move(chess.A3, chess.A4)
-        d = chess.Move(chess.B7, chess.B8)
-        e = chess.Move(chess.C7, chess.C8)
-
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(a))
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(b))
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(c))
-
-        self.boardWidget.addPieceAt(chess.A2, chess.Piece(chess.PAWN, chess.BLACK))
-        self.boardWidget.addPieceAt(chess.A7, chess.Piece(chess.PAWN, chess.WHITE))
-        self.boardWidget.addPieceAt(chess.B7, chess.Piece(chess.PAWN, chess.BLACK))
-        self.boardWidget.addPieceAt(chess.C7, chess.Piece(chess.ROOK, chess.WHITE))
-
-        self.assertTrue(self.boardWidget.isPseudoLegalPromotion(a))
-        self.assertTrue(self.boardWidget.isPseudoLegalPromotion(b))
-
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(c))
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(d))
-        self.assertFalse(self.boardWidget.isPseudoLegalPromotion(e))
 
     def testMovePieceAt(self):
         for gameName in os.listdir("test/games"):
@@ -485,7 +476,14 @@ class BoardWidgetTestCase(unittest.TestCase):
         pass
 
     def testHighlightLegalMoveCellsFor(self):
-        self.boardWidget.setFen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
+        self.boardWidget.setFen("R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1")
+
+        for w in self.boardWidget.cellWidgets():
+            canBePushedTo = self.boardWidget.pieceCanBePushedTo(w)
+            self.boardWidget.highlightLegalMoveCellsFor(w)
+            for square in canBePushedTo:
+                self.assertTrue(self.boardWidget.cellWidgetAtSquare(square).isHighlighted())
+            self.boardWidget.unhighlightCells()
 
     def testUncheckCells(self):
         self.boardWidget.accessibleSides = hichess.BOTH_SIDES
@@ -496,13 +494,13 @@ class BoardWidgetTestCase(unittest.TestCase):
 
         list(map(callback, self.boardWidget.cellWidgets()))
         self.boardWidget.uncheckCells(None)
-        self.assertFalse(list(filter(lambda _w: _w.isChecked(), self.boardWidget.cellWidgets())))
+        self.assertFalse(list(filter(hichess.CellWidget.isChecked, self.boardWidget.cellWidgets())))
 
         list(map(callback, self.boardWidget.cellWidgets()))
         for w in self.boardWidget.cellWidgets():
             if w.isChecked():
                 self.boardWidget.uncheckCells(exceptFor=w)
-                checkedWidgets = list(filter(lambda _w: _w.isChecked(), self.boardWidget.cellWidgets()))
+                checkedWidgets = list(filter(hichess.CellWidget.isChecked, self.boardWidget.cellWidgets()))
                 self.assertEqual(len(checkedWidgets), 1)
                 self.assertIs(checkedWidgets[0], w)
                 break
