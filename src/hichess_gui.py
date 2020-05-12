@@ -17,56 +17,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import PySide2.QtWidgets as QtWidgets
-from PySide2.QtCore import Qt, QRegExp, Slot, Signal
-from PySide2.QtGui import QRegExpValidator, QPixmap
+from PySide2.QtCore import Qt, Slot, QEvent
+from PySide2.QtGui import QPixmap
 
 import hichess.hichess as hichess
 import chess
+from stockfish import Stockfish
+import random
+
 import client
-
-
-class LoginDialog(QtWidgets.QDialog):
-    loginAccepted = Signal(str)
-    loginRejected = Signal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-
-        titleLabel = QtWidgets.QLabel("LOGIN")
-        titleLabel.setMinimumHeight(35)
-
-        self.usernameLineEdit = QtWidgets.QLineEdit()
-        self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
-        nameRx = QRegExp("[A-Za-z0-9_]{6,15}")
-        self.usernameLineEdit.setValidator(QRegExpValidator(nameRx))
-        self.usernameLineEdit.setMinimumHeight(35)
-
-        rememberMeCheckBox = QtWidgets.QCheckBox("Remember me")
-        rememberMeCheckBox.setMinimumHeight(35)
-
-        loginButton = QtWidgets.QPushButton("Login")
-        loginButton.clicked.connect(self.loginButtonClicked)
-        loginButton.setDefault(True)
-        loginButton.setMinimumHeight(35)
-
-        cancelButton = QtWidgets.QPushButton("Cancel")
-        cancelButton.clicked.connect(self.loginRejected.emit)
-        cancelButton.setMinimumHeight(35)
-
-        layout = QtWidgets.QFormLayout()
-        layout.addRow(titleLabel)
-        layout.addRow(self.usernameLineEdit)
-        layout.addRow(rememberMeCheckBox)
-        layout.addRow(cancelButton, loginButton)
-        layout.setAlignment(titleLabel, Qt.AlignCenter)
-        self.setLayout(layout)
-
-    @Slot()
-    def loginButtonClicked(self):
-        self.loginAccepted.emit(self.usernameLineEdit.text())
-        self.close()
+import dialogs
 
 
 class HichessGui(QtWidgets.QMainWindow):
@@ -76,27 +36,33 @@ class HichessGui(QtWidgets.QMainWindow):
         self.client = None
 
         self.scene = QtWidgets.QStackedWidget()
-        self.chessBoard = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
-        self.chessBoard.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
-                                       flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
+        self.boardWidget = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
+        self.boardWidget.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
+                                        flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
+        self.real_board = self.boardWidget.board
 
         self.setCentralWidget(self.scene)
         self.setupMainMenuScene()
         self.setupGameScene()
+        self.installEventFilter(self)
 
     def setupMainMenuScene(self):
         menuScene = QtWidgets.QWidget()
-        playOfflineButton = QtWidgets.QPushButton("Play Offline")
-        playOnlineButton = QtWidgets.QPushButton("Play Online")
+
+        pveButton = QtWidgets.QPushButton("Against the Computer")
+        offlinePvpButton = QtWidgets.QPushButton("Offline Pvp")
+        onlinePvpButton = QtWidgets.QPushButton("Online PvP")
         exitButton = QtWidgets.QPushButton("Exit")
 
-        playOfflineButton.clicked.connect(self.playOffline)
-        playOnlineButton.clicked.connect(self.playOnline)
+        pveButton.clicked.connect(self.playPve)
+        offlinePvpButton.clicked.connect(self.playOfflinePvp)
+        onlinePvpButton.clicked.connect(self.playOnlinePvp)
         exitButton.clicked.connect(self.close)
 
         menuSceneLayout = QtWidgets.QVBoxLayout()
-        menuSceneLayout.addWidget(playOfflineButton)
-        menuSceneLayout.addWidget(playOnlineButton)
+        menuSceneLayout.addWidget(pveButton)
+        menuSceneLayout.addWidget(offlinePvpButton)
+        menuSceneLayout.addWidget(onlinePvpButton)
         menuSceneLayout.addWidget(exitButton)
         menuScene.setLayout(menuSceneLayout)
 
@@ -108,17 +74,52 @@ class HichessGui(QtWidgets.QMainWindow):
         informationWidget = QtWidgets.QWidget()
 
         gameSceneLayout = QtWidgets.QHBoxLayout()
-        gameSceneLayout.addWidget(self.chessBoard)
+        gameSceneLayout.addWidget(self.boardWidget)
         gameSceneLayout.addWidget(informationWidget)
         gameSceneLayout.setContentsMargins(0, 0, 0, 0)
         gameSceneWidget.setLayout(gameSceneLayout)
         self.scene.addWidget(gameSceneWidget)
 
-    def playOffline(self):
+    @Slot()
+    def playPve(self):
+        pveDialog = dialogs.PveDialog(self)
+        res = pveDialog.exec_()
+
+        if res == QtWidgets.QDialog.Accepted:
+            SKILL_LEVLES = [0, 4, 8, 12, 14, 16, 18, 20]
+            variant, timeControl, level, color = pveDialog.data.values()
+
+            ####
+            self.boardWidget.setFen(pveDialog.fromPositionLineEdit.text())
+
+            if color == "random":
+                color = random.choice["white", "black"]
+            if color == "white":
+                self.boardWidget.accessibleSides = hichess.ONLY_WHITE_SIDE
+            elif color == "black":
+                self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
+                self.boardWidget.flip()
+
+            stockfish = Stockfish()
+            stockfish.set_skill_level(SKILL_LEVLES[pveDialog.data["level"]])
+
+            Slot()
+            def onMoveMade():
+                stockfish.set_fen_position(self.boardWidget.board.fen())
+                if not chess.COLOR_NAMES[self.boardWidget.board.turn] == color:
+                    self.boardWidget.push(chess.Move.from_uci(stockfish.get_best_move()))
+
+            self.boardWidget.moveMade.connect(onMoveMade)
+            self.scene.setCurrentIndex(1)
+            onMoveMade()
+
+    @Slot()
+    def playOfflinePvp(self):
         self.scene.setCurrentIndex(1)
 
-    def playOnline(self):
-        loginDialog = LoginDialog()
+    @Slot()
+    def playOnlinePvp(self):
+        loginDialog = dialogs.LoginDialog(self)
         loginDialog.loginRejected.connect(loginDialog.reject)
         loginDialog.loginAccepted.connect(self.connectToServer)
         loginDialog.exec_()
@@ -128,10 +129,12 @@ class HichessGui(QtWidgets.QMainWindow):
         self.scene.setCurrentIndex(1)
 
         if packet.contentType == client.WHITE_PLAYER_DATA:
-            self.chessBoard.accessibleSides = hichess.ONLY_WHITE_SIDE
+            self.boardWidget.accessibleSides = hichess.ONLY_WHITE_SIDE
+            self.boardWidget.synchronize()
         elif packet.contentType == client.BLACK_PLAYER_DATA:
-            self.chessBoard.accessibleSides = hichess.ONLY_BLACK_SIDE
-            self.chessBoard.flip()
+            self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
+            self.boardWidget.synchronize()
+            self.boardWidget.flip()
 
     @Slot()
     def connectToServer(self, username):
@@ -140,8 +143,19 @@ class HichessGui(QtWidgets.QMainWindow):
 
         self.client = client.Client(username, self)
         self.client.gameStarted.connect(self.startGame)
-        self.client.moveMade.connect(lambda move: self.chessBoard.movePieceAt(chess.Move.from_uci(move).from_square,
-                                                                              chess.Move.from_uci(move).to_square))
-        self.chessBoard.moveMade.connect(lambda move: self.client.sendPacket(client.MOVE, move))
+        self.client.moveMade.connect(lambda move: self.boardWidget.movePieceAt(chess.Move.from_uci(move).from_square,
+                                                                               chess.Move.from_uci(move).to_square))
+        self.boardWidget.moveMade.connect(lambda move: self.client.sendPacket(client.MOVE, move))
 
         self.setWindowTitle(username)
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_Left:
+                if self.boardWidget.board.move_stack:
+                    self.boardWidget.pop()
+            if event.key() == Qt.Key_Right:
+                if self.boardWidget.pop_stack:
+                    self.boardWidget.unpop()
+            return True
+        return super().eventFilter(watched, event)
