@@ -38,20 +38,25 @@ class Packet:
 class Client(QtCore.QObject):
     gameStarted = QtCore.Signal(Packet)
     moveMade = QtCore.Signal(str)
+    messageReceived = QtCore.Signal(str)
+    serverMessageReceived = QtCore.Signal(str)
 
     def __init__(self, username, parent=None):
-        super().__init__(parent)
+        super(Client, self).__init__(parent)
+
         self.webClient = QtWebSockets.QWebSocket(
             "", QtWebSockets.QWebSocketProtocol.VersionLatest, self)
         self.username = username
         self.functionMapper = {WHITE_PLAYER_DATA: self.processPlayerData,
                                BLACK_PLAYER_DATA: self.processPlayerData,
-                               MOVE: self.processMove}
+                               MOVE: self.processMove,
+                               MESSAGE: self.processMessage}
 
         self.webClient.connected.connect(self.authorize)
         self.webClient.binaryMessageReceived.connect(self.processBinaryMessage)
 
-        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.6:54545"))
+    def startConnectionWithServer(self):
+        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.4:54545"))
 
     @QtCore.Slot()
     def authorize(self):
@@ -67,6 +72,12 @@ class Client(QtCore.QObject):
 
     def processMove(self, packet: Packet):
         self.moveMade.emit(packet.payload)
+
+    def processMessage(self, message):
+        self.messageReceived.emit(message.payload)
+
+    def processServerMessage(self, message):
+        self.serverMessageReceived.emit(message)
 
     @QtCore.Slot()
     def processBinaryMessage(self, message: QtCore.QByteArray):

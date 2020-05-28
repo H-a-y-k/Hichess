@@ -3,55 +3,123 @@ from PySide2.QtWidgets import QDialog
 from PySide2.QtCore import Qt, Signal, Slot, QRegExp
 from PySide2.QtGui import QRegExpValidator, QPixmap
 
+import random
 from functools import partial
 
 from hichess.hichess import BoardWidget, BOTH_SIDES
 import chess
 
 
+class HLineWidget(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(HLineWidget, self).__init__(parent)
+        self.setFrameShape(QtWidgets.QFrame.HLine)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+
+class InvalidLogin(Exception):
+    pass
+
+
 class LoginDialog(QDialog):
     loginAccepted = Signal(str)
     loginRejected = Signal()
+
+    validator = QRegExpValidator(QRegExp("[A-Za-z0-9_]{6,15}"))
 
     def __init__(self, parent=None):
         super(LoginDialog, self).__init__(parent)
 
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
 
+        self.username = ""
+
         titleLabel = QtWidgets.QLabel("LOGIN")
+        titleLabel.setAlignment(Qt.AlignCenter)
         titleLabel.setMinimumHeight(35)
 
         self.usernameLineEdit = QtWidgets.QLineEdit()
         self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
-        nameRx = QRegExp("[A-Za-z0-9_]{6,15}")
-        self.usernameLineEdit.setValidator(QRegExpValidator(nameRx))
         self.usernameLineEdit.setMinimumHeight(35)
+        self.usernameLineEdit.setValidator(self.validator)
+        self.usernameLineEdit.textChanged.connect(self.onUsernameTextChanged)
 
         rememberMeCheckBox = QtWidgets.QCheckBox("Remember me")
         rememberMeCheckBox.setMinimumHeight(35)
 
-        loginButton = QtWidgets.QPushButton("Login")
-        loginButton.clicked.connect(self.loginButtonClicked)
-        loginButton.setDefault(True)
-        loginButton.setMinimumHeight(35)
+        self.loginButton = QtWidgets.QPushButton("Login")
+        self.loginButton.clicked.connect(self.loginButtonClicked)
+        self.loginButton.setDefault(True)
+        self.loginButton.setMinimumHeight(35)
+        self.loginButton.setDisabled(True)
 
-        cancelButton = QtWidgets.QPushButton("Cancel")
-        cancelButton.clicked.connect(self.loginRejected.emit)
-        cancelButton.setMinimumHeight(35)
+        self.cancelButton = QtWidgets.QPushButton("Cancel")
+        self.cancelButton.clicked.connect(self.loginRejected.emit)
+        self.cancelButton.setMinimumHeight(35)
 
         layout = QtWidgets.QFormLayout()
         layout.addRow(titleLabel)
         layout.addRow(self.usernameLineEdit)
         layout.addRow(rememberMeCheckBox)
-        layout.addRow(cancelButton, loginButton)
+        layout.addRow(self.cancelButton, self.loginButton)
         layout.setAlignment(titleLabel, Qt.AlignCenter)
         self.setLayout(layout)
+
+        self.loginRejected.connect(self.reject)
+
+    @Slot()
+    def onUsernameTextChanged(self, text):
+        if len(text) < 6:
+            if self.loginButton.isEnabled():
+                self.loginButton.setDisabled(True)
+        elif not self.loginButton.isEnabled():
+            self.loginButton.setEnabled(True)
 
     @Slot()
     def loginButtonClicked(self):
         if self.usernameLineEdit.validator().validate(self.usernameLineEdit.text(), 0):
-            self.loginAccepted.emit(self.usernameLineEdit.text())
-            self.close()
+            self.username = self.usernameLineEdit.text()
+            self.loginAccepted.emit(self.username)
+            self.accept()
+
+
+class ChooseVariantSection(QtWidgets.QWidget):
+    variantSelected = Signal(str)
+
+    def __init__(self, parent=None):
+        super(ChooseVariantSection, self).__init__(parent)
+
+        self.layout = QtWidgets.QFormLayout()
+
+        self.variantComboBox = QtWidgets.QComboBox()
+        self.variantComboBox.addItem("Standard")
+        self.variantComboBox.addItem("From position")
+        self.variantComboBox.currentIndexChanged[str].connect(self.onVariantSelected)
+
+        self.fromPositionLineEdit = QtWidgets.QLineEdit(chess.STARTING_FEN)
+        self.previewBoardWidget = BoardWidget()
+        self.previewBoardWidget.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
+                                               flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
+        self.fromPositionLineEdit.hide()
+
+        self.fromPositionLineEdit.textChanged.connect(self.updatePreviewBoardWidget)
+
+        self.layout.addRow("Variant", self.variantComboBox)
+        self.layout.addRow("", self.fromPositionLineEdit)
+        self.layout.addRow("", self.previewBoardWidget)
+
+        self.setLayout(self.layout)
+
+    @Slot(str)
+    def onVariantSelected(self, name: str):
+        self.fromPositionLineEdit.setVisible(name == "From position")
+
+    @Slot(str)
+    def updatePreviewBoardWidget(self, fen: str):
+        try:
+            self.previewBoardWidget.setFen(fen)
+        except Exception as e:
+            pass
 
 
 class PveDialog(QDialog):
@@ -59,32 +127,14 @@ class PveDialog(QDialog):
         super(PveDialog, self).__init__(parent)
 
         self.data = {
-            "variant": "standard",
-            "timeControl": "unlimited",
+            "fen": chess.STARTING_FEN,
             "level": 0,
             "color": "white"
         }
 
-        self.layout = QtWidgets.QFormLayout()
+        self.layout = QtWidgets.QVBoxLayout()
 
-        self.variantComboBox = QtWidgets.QComboBox()
-        self.variantComboBox.addItem("Standard")
-        self.variantComboBox.addItem("From Position")
-        self.variantComboBox.currentIndexChanged[str].connect(self.onNewVariantSelected)
-
-        self.fromPositionLineEdit = QtWidgets.QLineEdit(chess.STARTING_FEN)
-        self.previewBoardWidget = BoardWidget()
-        self.previewBoardWidget.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
-                                               flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
-        self.fromPositionLineEdit.textChanged.connect(self.updatePreviewBoardWidget)
-
-        self.fromPositionLineEdit.hide()
-        self.previewBoardWidget.hide()
-
-        self.timeControlComboBox = QtWidgets.QComboBox()
-        self.timeControlComboBox.addItem("Unlimited")
-        self.timeControlComboBox.addItem("Real Time")
-        self.timeControlComboBox.addItem("Correspondence")
+        self.chooseVariantSection = ChooseVariantSection()
 
         self.levelComboBox = QtWidgets.QComboBox()
         self.levelComboBox.addItem("Very Easy")
@@ -113,39 +163,26 @@ class PveDialog(QDialog):
         chooseColorLayout.addWidget(self.randomButton)
         chooseColorLayout.addWidget(self.whiteButton)
 
-        self.layout.addRow(QtWidgets.QLabel("Play against the Computer"))
-        self.layout.addRow("Variant", self.variantComboBox)
-        self.layout.addRow(self.fromPositionLineEdit)
-        self.layout.addRow("", self.previewBoardWidget)
-        self.layout.addRow("Time control", self.timeControlComboBox)
-        self.layout.addRow("Difficulty", self.levelComboBox)
-        self.layout.addRow(chooseColorLayout)
+        self.layout.setSpacing(5)
+
+        self.layout.addWidget(QtWidgets.QLabel("Play against the Computer"))
+        self.layout.addWidget(self.chooseVariantSection)
+        self.layout.addWidget(HLineWidget())
+        self.layout.addWidget(HLineWidget())
+        self.layout.addWidget(self.levelComboBox)
+        self.layout.addLayout(chooseColorLayout)
+
         self.setLayout(self.layout)
-
-        self.setMinimumWidth(500)
-
-    @Slot(str)
-    def onNewVariantSelected(self, name: str):
-        if name == "Standard":
-            self.fromPositionLineEdit.hide()
-            self.previewBoardWidget.hide()
-            self.resize(self.width(), self.minimumHeight())
-        elif name == "From Position":
-            self.fromPositionLineEdit.show()
-            self.previewBoardWidget.show()
-            self.resize(self.width(), 500)
-
-    @Slot(str)
-    def updatePreviewBoardWidget(self, fen: str):
-        try:
-            self.previewBoardWidget.setFen(fen)
-        except:
-            pass
 
     @Slot(QtWidgets.QPushButton)
     def doAccept(self, colorButton):
-        self.data["variant"] = self.variantComboBox.currentText().lower()
-        self.data["timeControl"] = self.timeControlComboBox.currentText().lower()
+        self.data["fen"] = self.chooseVariantSection.fromPositionLineEdit.text()
         self.data["level"] = self.levelComboBox.currentIndex()
-        self.data["color"] = colorButton.text().lower()
+
+        colorName = colorButton.text().lower()
+        if colorButton.text().lower() == "random":
+            self.data["color"] = random.choice([chess.WHITE, chess.BLACK])
+        else:
+            self.data["color"] = colorName == "white"
+
         self.accept()
