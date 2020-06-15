@@ -1,9 +1,9 @@
 import PySide2.QtCore as QtCore
 import PySide2.QtWebSockets as QtWebSockets
+from PySide2.QtNetwork import QAbstractSocket
 
 import logging
 from numpy import uint8, int64
-from functools import partial
 
 
 ContentType = uint8
@@ -40,23 +40,27 @@ class Client(QtCore.QObject):
     moveMade = QtCore.Signal(str)
     messageReceived = QtCore.Signal(str)
     serverMessageReceived = QtCore.Signal(str)
+    serverError = QtCore.Signal(str)
 
     def __init__(self, username, parent=None):
         super(Client, self).__init__(parent)
 
         self.webClient = QtWebSockets.QWebSocket(
             "", QtWebSockets.QWebSocketProtocol.VersionLatest, self)
+
         self.username = username
         self.functionMapper = {WHITE_PLAYER_DATA: self.processPlayerData,
                                BLACK_PLAYER_DATA: self.processPlayerData,
                                MOVE: self.processMove,
-                               MESSAGE: self.processMessage}
+                               MESSAGE: self.processMessage,
+                               SERVER_MESSAGE: self.processServerMessage,
+                               ERROR: self.processError}
 
         self.webClient.connected.connect(self.authorize)
         self.webClient.binaryMessageReceived.connect(self.processBinaryMessage)
 
     def startConnectionWithServer(self):
-        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.4:54545"))
+        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.6:54545"))
 
     @QtCore.Slot()
     def authorize(self):
@@ -77,7 +81,10 @@ class Client(QtCore.QObject):
         self.messageReceived.emit(message.payload)
 
     def processServerMessage(self, message):
-        self.serverMessageReceived.emit(message)
+        self.serverMessageReceived.emit(message.payload)
+
+    def processError(self, error):
+        self.serverError.emit(error.payload)
 
     @QtCore.Slot()
     def processBinaryMessage(self, message: QtCore.QByteArray):

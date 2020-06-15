@@ -83,6 +83,21 @@ class LoginDialog(QDialog):
             self.accept()
 
 
+class WaitDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(WaitDialog, self).__init__(parent)
+
+        waitLabel = QtWidgets.QLabel("Waiting for a player...")
+        waitLabel.setAlignment(Qt.AlignCenter)
+        cancelButton = QtWidgets.QPushButton("Cancel")
+        cancelButton.clicked.connect(self.reject)
+
+        waitDialogLayout = QtWidgets.QVBoxLayout()
+        waitDialogLayout.addWidget(waitLabel)
+        waitDialogLayout.addWidget(cancelButton)
+        self.setLayout(waitDialogLayout)
+
+
 class ChooseVariantSection(QtWidgets.QWidget):
     variantSelected = Signal(str)
 
@@ -113,6 +128,11 @@ class ChooseVariantSection(QtWidgets.QWidget):
     @Slot(str)
     def onVariantSelected(self, name: str):
         self.fromPositionLineEdit.setVisible(name == "From position")
+
+        if name == "Standard":
+            self.previewBoardWidget.reset()
+        elif name == "From position":
+            self.previewBoardWidget.setFen(self.fromPositionLineEdit.text())
 
     @Slot(str)
     def updatePreviewBoardWidget(self, fen: str):
@@ -167,7 +187,6 @@ class PveDialog(QDialog):
 
         self.layout.addWidget(QtWidgets.QLabel("Play against the Computer"))
         self.layout.addWidget(self.chooseVariantSection)
-        self.layout.addWidget(HLineWidget())
         self.layout.addWidget(HLineWidget())
         self.layout.addWidget(self.levelComboBox)
         self.layout.addLayout(chooseColorLayout)

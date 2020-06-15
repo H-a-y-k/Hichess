@@ -6,6 +6,7 @@ import logging
 import sys
 
 import resources
+import qbreezercc
 
 
 if __name__ == "__main__":
@@ -19,11 +20,20 @@ if __name__ == "__main__":
     if status == LoginDialog.Accepted and loginDialog.validator.regExp().exactMatch(loginDialog.username):
         window = HichessGui(username=loginDialog.username)
 
-        f = QFile(":/style/styles.css")
-        ts = QTextStream(f)
-        if f.open(QFile.ReadOnly):
-            app.setStyleSheet(ts.readAll())
+        breeze = QFile(":qbreeze/dark.qss")
+        main = QFile(":/style/styles.css")
 
+        breezeQss = ""
+        mainQss = ""
+
+        if breeze.open(QFile.ReadOnly):
+            textstream = QTextStream(breeze)
+            breezeQss = textstream.readAll()
+        if main.open(QFile.ReadOnly):
+            textstream = QTextStream(main)
+            mainQss = textstream.readAll()
+
+        app.setStyleSheet(f"{breezeQss}{mainQss}")
         window.setMinimumSize(800, 800)
         window.showMaximized()
     else:

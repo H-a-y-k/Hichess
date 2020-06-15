@@ -1,8 +1,5 @@
 from PySide2.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton
-from PySide2.QtCore import QModelIndex
-from collections import deque
-
-import chess
+from PySide2.QtCore import Qt, Slot
 
 
 class GameControlPanel(QWidget):
@@ -15,6 +12,11 @@ class GameControlPanel(QWidget):
         self.nextMoveButton = QPushButton(">")
         self.toCurrentFenButton = QPushButton(">>")
 
+        self.toStartFenButton.setDisabled(True)
+        self.previousMoveButton.setDisabled(True)
+        self.nextMoveButton.setDisabled(True)
+        self.toCurrentFenButton.setDisabled(True)
+
         self.toolButtonsLayout = QHBoxLayout()
         self.toolButtonsLayout.setContentsMargins(0, 0, 0, 0)
         self.toolButtonsLayout.setSpacing(0)
@@ -24,13 +26,17 @@ class GameControlPanel(QWidget):
         self.toolButtonsLayout.addWidget(self.nextMoveButton)
         self.toolButtonsLayout.addWidget(self.toCurrentFenButton)
 
-        self.moves = []
-        self._column = 0
+        self.nextColumn = 0
 
         self.firstName = QLabel(first)
         self.secondName = QLabel(second)
 
         self.moveTable = QTableWidget()
+        self.moveTable.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.moveTable.setFocusPolicy(Qt.NoFocus)
+        self.moveTable.setSelectionMode(QTableWidget.SingleSelection)
+        self.moveTable.currentCellChanged.connect(self.onCurrentChanged)
+
         self.moveTable.setColumnCount(2)
         self.moveTable.horizontalHeader().hide()
         self.moveTable.setMaximumHeight(300)
@@ -52,7 +58,20 @@ class GameControlPanel(QWidget):
         if not self.moveTable.rowCount():
             return True
         return (self.moveTable.currentRow() == self.moveTable.rowCount() - 1 and
-                self.moveTable.currentColumn() != self._column)
+                self.moveTable.currentColumn() != self.nextColumn)
+
+    def reset(self):
+        self.moveTable.setRowCount(0)
+        self.nextColumn = 0
+        self.toStartFenButton.setDisabled(True)
+        self.previousMoveButton.setDisabled(True)
+        self.nextMoveButton.setDisabled(True)
+        self.toCurrentFenButton.setDisabled(True)
+
+    @Slot(int, int)
+    def onCurrentChanged(self, row, column):
+        self.toStartFenButton.setDisabled(self.moveTable.currentItem() is None)
+        self.previousMoveButton.setDisabled(self.moveTable.currentItem() is None)
 
     def toPreviousCell(self):
         current = self.moveTable.currentItem()
@@ -88,13 +107,13 @@ class GameControlPanel(QWidget):
 
     def addMove(self, move: str) -> QTableWidgetItem:
         if self.isLive():
-            if not self._column:
+            if not self.nextColumn:
                 self.moveTable.setRowCount(self.moveTable.rowCount() + 1)
 
         item = QTableWidgetItem(move)
-        self.moveTable.setItem(self.moveTable.rowCount()-1, self._column, item)
+        self.moveTable.setItem(self.moveTable.rowCount()-1, self.nextColumn, item)
 
-        self._column = not self._column
+        self.nextColumn = not self.nextColumn
 
         return item
 
@@ -103,11 +122,11 @@ class GameControlPanel(QWidget):
             if self.isLive():
                 self.toPreviousCell()
 
-            self._column = not self._column
+            self.nextColumn = not self.nextColumn
 
-            self.moveTable.takeItem(self.moveTable.rowCount() - 1, self._column)
+            self.moveTable.takeItem(self.moveTable.rowCount() - 1, self.nextColumn)
 
-            if not self._column:
+            if not self.nextColumn:
                 self.moveTable.setRowCount(self.moveTable.rowCount()-1)
 
     def swapNames(self):

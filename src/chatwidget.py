@@ -10,9 +10,10 @@ class Sender(Enum):
     OPPONENT = 1
     SERVER = 2
 
+
 YOU = Sender.YOU
 OPPONENT = Sender.OPPONENT
-SERVER = Sender.OPPONENT
+SERVER = Sender.SERVER
 
 
 class MessageWidget(QtWidgets.QTextBrowser):
@@ -31,6 +32,11 @@ class MessageWidget(QtWidgets.QTextBrowser):
         fm = QFontMetrics(self.font())
         self.setFixedWidth(min([fm.horizontalAdvance(self.toPlainText())+10, newSize.toSize().width()]))
         self.setFixedHeight(newSize.height()+5)
+
+    def focusOutEvent(self, event):
+        cursor = self.textCursor()
+        cursor.clearSelection()
+        self.setTextCursor(cursor)
 
 
 class MessageInputWidget(QtWidgets.QTextEdit):
@@ -74,6 +80,7 @@ class ChatWidget(QtWidgets.QDockWidget):
         ))
         self.sendButton = QtWidgets.QPushButton("Send")
         self.sendButton.clicked.connect(self.sendMessage)
+        self.sendButton.setFocusPolicy(Qt.StrongFocus)
 
         self.messageInputLayout = QtWidgets.QHBoxLayout()
         self.messageInputLayout.addWidget(self.messageInputWidget)
@@ -115,4 +122,4 @@ class ChatWidget(QtWidgets.QDockWidget):
         elif sender == OPPONENT:
             self.chatLayout.addWidget(messageWidget, alignment=Qt.AlignRight)
         else:
-            self.chatLayout.addWidget(messageWidget, alignment=Qt.AlignCenter)
+            self.chatLayout.addWidget(messageWidget, alignment=Qt.AlignHCenter)

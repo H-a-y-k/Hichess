@@ -17,8 +17,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import PySide2.QtWidgets as QtWidgets
-from PySide2.QtCore import Qt, Slot, QEvent
+from PySide2.QtCore import Qt, Slot, QEvent, QTimer
 from PySide2.QtGui import QPixmap
+from PySide2.QtNetwork import QAbstractSocket
 
 import hichess.hichess as hichess
 import chess
@@ -37,7 +38,6 @@ class HichessGui(QtWidgets.QMainWindow):
         super(HichessGui, self).__init__()
 
         self.username = username
-        self.client = client.Client(self.username, self)
 
         self.scene = QtWidgets.QStackedWidget()
         self.boardWidget = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
@@ -49,18 +49,118 @@ class HichessGui(QtWidgets.QMainWindow):
         self.boardWidget.setFocusPolicy(Qt.StrongFocus)
 
         self.boardWidget.moveMade.connect(self.updateMoveTable)
+        self.boardWidget.checkmate.connect(self.onCheckmate)
+        self.boardWidget.draw.connect(self.onDraw)
+        self.boardWidget.gameOver.connect(self.onGameOver)
+
+        self.stockfishEngine = None
 
         self.controlPanelWidget = control_panel.GameControlPanel(self.username, self.username)
+        self.controlPanelWidget.setFocusPolicy(Qt.NoFocus)
         self.controlPanelWidget.flipButton.clicked.connect(self.flip)
         self.controlPanelWidget.toStartFenButton.clicked.connect(self.toStartFen)
         self.controlPanelWidget.previousMoveButton.clicked.connect(self.previousMove)
         self.controlPanelWidget.nextMoveButton.clicked.connect(self.nextMove)
         self.controlPanelWidget.toCurrentFenButton.clicked.connect(self.toCurrentFen)
+        self.controlPanelWidget.moveTable.cellClicked.connect(self.onCellClicked)
+
+        self.client = client.Client(self.username, self)
+
+        self.client.webClient.error.connect(self.onClientErrorReceived)
+        self.client.serverError.connect(self.onServerError)
+        self.client.webClient.connected.connect(self.onClientConnected)
+        self.client.gameStarted.connect(self.startGame)
+        self.client.moveMade.connect(self.onClientMoveMade)
+        self.waitDialog = dialogs.WaitDialog(self)
+
+        self.chatWidget = chatwidget.ChatWidget()
 
         self.setCentralWidget(self.scene)
         self.setupMainMenuScene()
         self.setupGameScene()
         self.installEventFilter(self)
+
+    def toMainMenu(self):
+        self.boardWidget.reset()
+
+        self.controlPanelWidget.reset()
+        self.scene.setCurrentIndex(0)
+
+        if self.stockfishEngine:
+            self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
+            self.stockfishEngine = None
+
+        if self.client.webClient.state() == QAbstractSocket.ConnectedState:
+            self.client.webClient.close()
+        if self.chatWidget.isVisible():
+            self.chatWidget.close()
+            self.chatWidget = chatwidget.ChatWidget()
+
+    @Slot(str)
+    def pveOnMoveMade(self, move):
+        if not self.boardWidget.board.is_game_over():
+            self.stockfishEngine.set_fen_position(self.boardWidget.board.fen())
+
+            color = (self.boardWidget.accessibleSides == hichess.ONLY_WHITE_SIDE)
+
+            if self.boardWidget.board.turn != color:
+                self.boardWidget.push(chess.Move.from_uci(self.stockfishEngine.get_best_move()))
+        else:
+            if self.stockfishEngine:
+                self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
+                self.stockfishEngine = None
+
+    def login(self):
+        loginDialog = dialogs.LoginDialog(self)
+        status = loginDialog.exec_()
+
+        if status == dialogs.LoginDialog.Accepted:
+            self.username = loginDialog.username
+        else:
+            raise dialogs.InvalidLogin()
+
+    @Slot()
+    def onClientConnected(self):
+        self.client.gameStarted.connect(self.waitDialog.accept)
+        self.waitDialog.exec_()
+
+    @Slot()
+    def onClientErrorReceived(self, error):
+        if error == QAbstractSocket.SocketTimeoutError or error == QAbstractSocket.ConnectionRefusedError:
+            QtWidgets.QMessageBox.warning(self, "Error",
+                                          "Couldn't connect to the server")
+        elif error == QAbstractSocket.RemoteHostClosedError:
+            self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+
+    @Slot(str)
+    def onServerError(self, error):
+        QtWidgets.QMessageBox.warning(self, "Server", error)
+        if self.waitDialog.isVisible():
+            self.waitDialog.close()
+        self.client.webClient.abort()
+        self.username = ""
+        self.login()
+
+    @Slot()
+    def onCheckmate(self, side):
+        msg = QtWidgets.QMessageBox()
+        msg.setWindowTitle("Checkmate")
+        msg.setIcon(QtWidgets.QMessageBox.Information)
+        msg.setText(f"{chess.COLOR_NAMES[side]} player won the game!")
+        msg.exec_()
+
+    @Slot()
+    def onDraw(self):
+        msg = QtWidgets.QMessageBox()
+        msg.setWindowTitle("Draw")
+        msg.setIcon(QtWidgets.QMessageBox.Information)
+        msg.setText("This is a draw")
+        msg.exec_()
+
+    @Slot()
+    def onGameOver(self):
+        if self.client.webClient.state() == QAbstractSocket.ConnectedState:
+            self.client.webClient.close(0)
 
     def setupMainMenuScene(self):
         menuScene = QtWidgets.QWidget()
@@ -96,13 +196,32 @@ class HichessGui(QtWidgets.QMainWindow):
 
     @Slot()
     def toStartFen(self):
-        while self.boardWidget.board.move_stack:
-            self.previousMove()
+        self.boardWidget.goToMove(0)
+        self.controlPanelWidget.moveTable.setCurrentCell(-1, -1)
+
+        if not self.boardWidget.blockBoardOnPop:
+            self.controlPanelWidget.moveTable.setRowCount(0)
+            self.controlPanelWidget.nextColumn = 0
+
+        if self.boardWidget.popStack:
+            self.controlPanelWidget.toCurrentFenButton.setDisabled(False)
+            self.controlPanelWidget.nextMoveButton.setDisabled(False)
 
     @Slot()
     def toCurrentFen(self):
-        while self.boardWidget.popStack:
-            self.nextMove()
+        if not self.boardWidget.blockBoardOnPop:
+            popStack = self.boardWidget.popStack.copy()
+            while popStack:
+                self.updateMoveTable(self.boardWidget.board.san(popStack.pop()))
+
+        moveID = len(self.boardWidget.board.move_stack) + len(self.boardWidget.popStack)
+        self.boardWidget.goToMove(moveID)
+        self.controlPanelWidget.moveTable.setCurrentCell(
+            self.controlPanelWidget.moveTable.rowCount()-1, not self.controlPanelWidget.nextColumn)
+
+        if not self.boardWidget.popStack:
+            self.controlPanelWidget.toCurrentFenButton.setDisabled(True)
+            self.controlPanelWidget.nextMoveButton.setDisabled(True)
 
     @Slot()
     def previousMove(self):
@@ -113,14 +232,29 @@ class HichessGui(QtWidgets.QMainWindow):
             else:
                 self.controlPanelWidget.toPreviousCell()
 
+            if self.boardWidget.popStack:
+                self.controlPanelWidget.toCurrentFenButton.setDisabled(False)
+                self.controlPanelWidget.nextMoveButton.setDisabled(False)
+
     @Slot()
     def nextMove(self):
         if self.boardWidget.popStack:
             move = self.boardWidget.unpop()
+
             if not self.boardWidget.blockBoardOnPop:
                 self.updateMoveTable(move)
             else:
                 self.controlPanelWidget.toNextCell()
+
+            if not self.boardWidget.popStack:
+                self.controlPanelWidget.toCurrentFenButton.setDisabled(True)
+                self.controlPanelWidget.nextMoveButton.setDisabled(True)
+
+    @Slot()
+    def onCellClicked(self, row, column):
+        if self.controlPanelWidget.moveTable.item(row, column):
+            moveNumber = row * 2 + column
+            self.boardWidget.goToMove(moveNumber+1)
 
     def setupGameScene(self):
         gameSceneWidget = QtWidgets.QWidget()
@@ -129,6 +263,7 @@ class HichessGui(QtWidgets.QMainWindow):
         gameSceneLayout.addWidget(self.boardWidget)
         gameSceneLayout.addWidget(self.controlPanelWidget)
         gameSceneLayout.setContentsMargins(0, 0, 0, 0)
+        gameSceneLayout.setAlignment(Qt.AlignTop)
         gameSceneWidget.setLayout(gameSceneLayout)
 
         self.scene.addWidget(gameSceneWidget)
@@ -136,80 +271,63 @@ class HichessGui(QtWidgets.QMainWindow):
     @Slot()
     def playPve(self):
         pveDialog = dialogs.PveDialog(self)
+        pveDialog.setMinimumSize(500, 630)
         res = pveDialog.exec_()
 
         if res == QtWidgets.QDialog.Accepted:
             self.boardWidget.blockBoardOnPop = True
+            self.controlPanelWidget.moveTable.setDisabled(False)
 
             SKILL_LEVELS = [0, 4, 8, 12, 14, 16, 18, 20]
             fen, level, color = pveDialog.data.values()
             self.controlPanelWidget.firstName.setText(f"Stockfish {SKILL_LEVELS[level]}")
 
+            self.stockfishEngine = Stockfish()
+
             # fen
-            self.boardWidget.setFen(pveDialog.chooseVariantSection.fromPositionLineEdit.text())
+            self.boardWidget.setFen(fen)
+            self.stockfishEngine.set_fen_position(fen)
 
             # level
-            stockfish = Stockfish()
-            stockfish.set_skill_level(SKILL_LEVELS[level])
+            self.stockfishEngine.set_skill_level(SKILL_LEVELS[level])
 
-            Slot(str)
-            def onMoveMade(move):
-                stockfish.set_fen_position(self.boardWidget.board.fen())
-                if self.boardWidget.board.turn != color:
-                    self.boardWidget.push(chess.Move.from_uci(stockfish.get_best_move()))
-
-            self.boardWidget.moveMade.connect(onMoveMade)
+            self.boardWidget.moveMade.connect(self.pveOnMoveMade)
 
             # color
             if color == chess.WHITE:
                 self.boardWidget.accessibleSides = hichess.ONLY_WHITE_SIDE
+                self.boardWidget.flipped = False
             elif color == chess.BLACK:
                 self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
-                self.boardWidget.flip()
+                self.boardWidget.flipped = True
 
-            stockfish.set_fen_position(self.boardWidget.board.fen())
+            self.stockfishEngine.set_fen_position(self.boardWidget.board.fen())
             if self.boardWidget.board.turn != color:
-                self.boardWidget.push(chess.Move.from_uci(stockfish.get_best_move()))
+                self.boardWidget.push(chess.Move.from_uci(self.stockfishEngine.get_best_move()))
 
             self.scene.setCurrentIndex(1)
 
     @Slot()
     def playOfflinePvp(self):
         self.boardWidget.blockBoardOnPop = False
+        self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+        self.controlPanelWidget.moveTable.setDisabled(True)
         self.scene.setCurrentIndex(1)
 
     @Slot()
     def playOnlinePvp(self):
         if not dialogs.LoginDialog.validator.validate(self.username, 0):
-            loginDialog = dialogs.LoginDialog(self)
-            status = loginDialog.exec_()
-            if not status == dialogs.LoginDialog.Accepted:
-                self.username = loginDialog.username
-            else:
-                raise dialogs.InvalidLogin()
-
-        waitDialog = QtWidgets.QDialog(self)
-
-        waitLabel = QtWidgets.QLabel("Waiting for player...")
-        waitLabel.setAlignment(Qt.AlignCenter)
-        cancelButton = QtWidgets.QPushButton("Cancel")
-        cancelButton.clicked.connect(waitDialog.reject)
-
-        waitDialogLayout = QtWidgets.QVBoxLayout()
-        waitDialogLayout.addWidget(waitLabel)
-        waitDialogLayout.addWidget(cancelButton)
-        waitDialog.setLayout(waitDialogLayout)
-
-        self.client.gameStarted.connect(waitDialog.accept)
-        self.client.gameStarted.connect(self.startGame)
+            self.login()
+        self.client.username = self.username
         self.client.startConnectionWithServer()
-        self.searchForGame()
-
-        waitDialog.exec_()
 
     @Slot()
     def startGame(self, packet: client.Packet):
+        self.boardWidget.moveMade.connect(partial(self.client.sendPacket, client.MOVE))
+
         self.boardWidget.blockBoardOnPop = True
+        self.controlPanelWidget.moveTable.setDisabled(False)
+
         self.scene.setCurrentIndex(1)
 
         opponentUsername = packet.payload
@@ -224,34 +342,29 @@ class HichessGui(QtWidgets.QMainWindow):
             self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
             self.boardWidget.flip()
 
-        cw = chatwidget.ChatWidget()
-        self.addDockWidget(Qt.LeftDockWidgetArea, cw)
-        cw.messageToBeSent.connect(partial(self.client.sendPacket, client.MESSAGE))
-        self.client.messageReceived.connect(partial(cw.showMessage, chatwidget.OPPONENT))
-        self.client.serverMessageReceived.connect(partial(cw.showMessage, chatwidget.SERVER))
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.chatWidget)
+        self.chatWidget.messageToBeSent.connect(partial(self.client.sendPacket, client.MESSAGE))
+        self.client.messageReceived.connect(partial(self.chatWidget.showMessage, chatwidget.OPPONENT))
+        self.client.serverMessageReceived.connect(partial(self.chatWidget.showMessage, chatwidget.SERVER))
 
     @Slot(str)
     def onClientMoveMade(self, move):
         if not self.boardWidget.popStack:
-            self.boardWidget.makeMove(chess.Move.from_uci(move))
+            self.boardWidget.makeMove(self.boardWidget.board.parse_san(move))
             self.updateMoveTable(move)
         else:
             self.boardWidget.popStack.appendleft(chess.Move.from_uci(move))
-            self.controlPanelWidget.addMove(not self.boardWidget.board.turn, move)
-
-    def searchForGame(self):
-        self.client.moveMade.connect(self.onClientMoveMade)
-        self.boardWidget.moveMade.connect(partial(self.client.sendPacket, client.MOVE))
-
-        self.setWindowTitle(self.username)
+            self.controlPanelWidget.addMove(move)
 
     def eventFilter(self, watched, event) -> bool:
         if event.type() == QEvent.KeyPress:
             if event.key() == Qt.Key_Left:
                 if self.boardWidget.board.move_stack:
-                    self.controlPanelWidget.previousMoveButton.click()
-            if event.key() == Qt.Key_Right:
+                    self.previousMove()
+            elif event.key() == Qt.Key_Right:
                 if self.boardWidget.popStack:
-                    self.controlPanelWidget.nextMoveButton.click()
+                    self.nextMove()
+            elif event.key() == Qt.Key_Escape:
+                self.toMainMenu()
             return True
         return super().eventFilter(watched, event)

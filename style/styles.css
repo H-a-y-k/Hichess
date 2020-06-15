@@ -82,15 +82,15 @@ CellWidget[marked=false] {}
     border-image: url(:/images/white_king.png)  0 0 0 0  stretch stretch;
 }
 
-#cell_white_king[checkedKing=true] {
+#cell_white_king[inCheck=true] {
     background-color: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.8, fx: 0.5, fy: 0.5, stop: 0 red, stop: 1 transparent)
 }
 
-#cell_black_king{
+#cell_black_king {
     border-image: url(:/images/black_king.png)  0 0 0 0  stretch stretch;
 }
 
-#cell_black_king[checkedKing=true] {
+#cell_black_king[inCheck=true] {
     background-color: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.8, fx: 0.5, fy: 0.5, stop: 0 red, stop: 1 transparent)
 }
 
