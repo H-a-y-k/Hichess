@@ -17,14 +17,21 @@ class GameControlPanel(QWidget):
         self.nextMoveButton.setDisabled(True)
         self.toCurrentFenButton.setDisabled(True)
 
+        self.flipButton.setFixedWidth(50)
+        self.toStartFenButton.setFixedWidth(50)
+        self.previousMoveButton.setFixedWidth(50)
+        self.nextMoveButton.setFixedWidth(50)
+        self.toCurrentFenButton.setFixedWidth(50)
+
         self.toolButtonsLayout = QHBoxLayout()
         self.toolButtonsLayout.setContentsMargins(0, 0, 0, 0)
-        self.toolButtonsLayout.setSpacing(0)
         self.toolButtonsLayout.addWidget(self.flipButton)
         self.toolButtonsLayout.addWidget(self.toStartFenButton)
         self.toolButtonsLayout.addWidget(self.previousMoveButton)
         self.toolButtonsLayout.addWidget(self.nextMoveButton)
         self.toolButtonsLayout.addWidget(self.toCurrentFenButton)
+        self.toolButtonsLayout.addStretch()
+        self.toolButtonsLayout.setSpacing(12)
 
         self.nextColumn = 0
 
@@ -40,6 +47,7 @@ class GameControlPanel(QWidget):
         self.moveTable.setColumnCount(2)
         self.moveTable.horizontalHeader().hide()
         self.moveTable.setMaximumHeight(300)
+        self.moveTable.setFixedWidth(300)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

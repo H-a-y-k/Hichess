@@ -15,6 +15,11 @@
         <file>images/white_king.png</file>
         <file>images/black_king.png</file>
         <file>style/styles.css</file>
+        <file>images/back.png</file>
+        <file>images/fullscreen.png</file>
+        <file>images/lighttheme.png</file>
+        <file>images/zenmode.png</file>
+        <file>images/copy.png</file>
   </qresource>
 
 </RCC>

@@ -17,8 +17,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import PySide2.QtWidgets as QtWidgets
-from PySide2.QtCore import Qt, Slot, QEvent, QTimer
-from PySide2.QtGui import QPixmap
+from PySide2.QtCore import Qt, Slot, QObject
+from PySide2.QtGui import QPixmap, QIcon, QKeySequence
 from PySide2.QtNetwork import QAbstractSocket
 
 import hichess.hichess as hichess
@@ -32,6 +32,8 @@ import dialogs
 import control_panel
 import chatwidget
 
+import pyperclip
+
 
 class HichessGui(QtWidgets.QMainWindow):
     def __init__(self, username: str):
@@ -39,12 +41,12 @@ class HichessGui(QtWidgets.QMainWindow):
 
         self.username = username
 
-        self.scene = QtWidgets.QStackedWidget()
+        self.stackedWidget = QtWidgets.QStackedWidget()
         self.boardWidget = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
         self.boardWidget.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
                                         flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
         self.boardWidget.setSizePolicy(QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.MinimumExpanding
         ))
         self.boardWidget.setFocusPolicy(Qt.StrongFocus)
 
@@ -75,18 +77,46 @@ class HichessGui(QtWidgets.QMainWindow):
 
         self.chatWidget = chatwidget.ChatWidget()
 
-        self.setCentralWidget(self.scene)
+        self.toolbar = QtWidgets.QToolBar()
+        self.backAction = QtWidgets.QAction(QIcon(":/images/back.png"), "Back")
+        self.fullscreenAction = QtWidgets.QAction(QIcon(":/images/fullscreen.png"), "Fullscreen")
+        self.themeAction = QtWidgets.QAction(QIcon(":/images/lighttheme.png"), "Theme")
+        self.zenModeAction = QtWidgets.QAction(QIcon(":/images/zenmode.png"), "Zenmode")
+        self.copyFenAction = QtWidgets.QAction(QIcon(":/images/copy.png"), "Copy Fen")
+
+        self.backAction.triggered.connect(self.toMainMenu)
+        self.fullscreenAction.triggered.connect(self.updateFullscreen)
+        self.zenModeAction.triggered.connect(self.updateZenMode)
+        self.copyFenAction.triggered.connect(partial(pyperclip.copy, self.boardWidget.board.fen()))
+
+        self.toolbar.addAction(self.backAction)
+        self.toolbar.addAction(self.fullscreenAction)
+        self.toolbar.addAction(self.themeAction)
+        self.toolbar.addAction(self.zenModeAction)
+        self.toolbar.addAction(self.copyFenAction)
+
+        self.zenmode = False
+
+        self.backAction.setShortcut(QKeySequence(Qt.Key_Escape))
+        self.fullscreenAction.setShortcut(QKeySequence("Ctrl+F"))
+        self.addToolBar(Qt.RightToolBarArea, self.toolbar)
+        self.toolbar.hide()
+
+        self.setCentralWidget(self.stackedWidget)
         self.setupMainMenuScene()
         self.setupGameScene()
-        self.installEventFilter(self)
 
+    @Slot()
     def toMainMenu(self):
+        self.toolbar.hide()
+
         self.boardWidget.reset()
 
         self.controlPanelWidget.reset()
-        self.scene.setCurrentIndex(0)
+        self.stackedWidget.setCurrentIndex(0)
 
         if self.stockfishEngine:
+            self.toolbar.hide()
             self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
             self.stockfishEngine = None
 
@@ -95,6 +125,26 @@ class HichessGui(QtWidgets.QMainWindow):
         if self.chatWidget.isVisible():
             self.chatWidget.close()
             self.chatWidget = chatwidget.ChatWidget()
+
+    @Slot()
+    def updateFullscreen(self):
+        if self.isFullScreen():
+            self.setWindowState(self.windowState() & ~Qt.WindowFullScreen)
+        else:
+            self.setWindowState(self.windowState() | Qt.WindowFullScreen)
+
+    @Slot()
+    def updateZenMode(self):
+        isFullscreen = self.windowState() & Qt.WindowFullScreen
+        if not (not self.zenmode and isFullscreen):
+            self.updateFullscreen()
+
+        self.zenmode = not self.zenmode
+
+        self.fullscreenAction.setDisabled(self.zenmode)
+        self.controlPanelWidget.moveTable.setVisible(not self.zenmode)
+        self.controlPanelWidget.firstName.setVisible(not self.zenmode)
+        self.controlPanelWidget.secondName.setVisible(not self.zenmode)
 
     @Slot(str)
     def pveOnMoveMade(self, move):
@@ -182,7 +232,7 @@ class HichessGui(QtWidgets.QMainWindow):
         menuSceneLayout.addWidget(exitButton)
         menuScene.setLayout(menuSceneLayout)
 
-        self.scene.addWidget(menuScene)
+        self.stackedWidget.addWidget(menuScene)
 
     @Slot()
     def updateMoveTable(self, move):
@@ -266,7 +316,7 @@ class HichessGui(QtWidgets.QMainWindow):
         gameSceneLayout.setAlignment(Qt.AlignTop)
         gameSceneWidget.setLayout(gameSceneLayout)
 
-        self.scene.addWidget(gameSceneWidget)
+        self.stackedWidget.addWidget(gameSceneWidget)
 
     @Slot()
     def playPve(self):
@@ -275,6 +325,8 @@ class HichessGui(QtWidgets.QMainWindow):
         res = pveDialog.exec_()
 
         if res == QtWidgets.QDialog.Accepted:
+            self.toolbar.show()
+
             self.boardWidget.blockBoardOnPop = True
             self.controlPanelWidget.moveTable.setDisabled(False)
 
@@ -285,7 +337,6 @@ class HichessGui(QtWidgets.QMainWindow):
             self.stockfishEngine = Stockfish()
 
             # fen
-            self.boardWidget.setFen(fen)
             self.stockfishEngine.set_fen_position(fen)
 
             # level
@@ -305,19 +356,21 @@ class HichessGui(QtWidgets.QMainWindow):
             if self.boardWidget.board.turn != color:
                 self.boardWidget.push(chess.Move.from_uci(self.stockfishEngine.get_best_move()))
 
-            self.scene.setCurrentIndex(1)
+            self.stackedWidget.setCurrentIndex(1)
 
     @Slot()
     def playOfflinePvp(self):
+        self.toolbar.show()
         self.boardWidget.blockBoardOnPop = False
         self.boardWidget.accessibleSides = hichess.BOTH_SIDES
         self.controlPanelWidget.moveTable.setDisabled(True)
-        self.scene.setCurrentIndex(1)
+        self.stackedWidget.setCurrentIndex(1)
 
     @Slot()
     def playOnlinePvp(self):
         if not dialogs.LoginDialog.validator.validate(self.username, 0):
             self.login()
+        self.toolbar.show()
         self.client.username = self.username
         self.client.startConnectionWithServer()
 
@@ -328,7 +381,7 @@ class HichessGui(QtWidgets.QMainWindow):
         self.boardWidget.blockBoardOnPop = True
         self.controlPanelWidget.moveTable.setDisabled(False)
 
-        self.scene.setCurrentIndex(1)
+        self.stackedWidget.setCurrentIndex(1)
 
         opponentUsername = packet.payload
 
@@ -356,15 +409,10 @@ class HichessGui(QtWidgets.QMainWindow):
             self.boardWidget.popStack.appendleft(chess.Move.from_uci(move))
             self.controlPanelWidget.addMove(move)
 
-    def eventFilter(self, watched, event) -> bool:
-        if event.type() == QEvent.KeyPress:
-            if event.key() == Qt.Key_Left:
-                if self.boardWidget.board.move_stack:
-                    self.previousMove()
-            elif event.key() == Qt.Key_Right:
-                if self.boardWidget.popStack:
-                    self.nextMove()
-            elif event.key() == Qt.Key_Escape:
-                self.toMainMenu()
-            return True
-        return super().eventFilter(watched, event)
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Left:
+            if self.boardWidget.board.move_stack:
+                self.previousMove()
+        elif event.key() == Qt.Key_Right:
+            if self.boardWidget.popStack:
+                self.nextMove()
