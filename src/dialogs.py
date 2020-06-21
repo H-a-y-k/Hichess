@@ -17,24 +17,24 @@ class HLineWidget(QtWidgets.QFrame):
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
 
-class InvalidLogin(Exception):
+class InvalidUsername(Exception):
     pass
 
 
-class LoginDialog(QDialog):
-    loginAccepted = Signal(str)
-    loginRejected = Signal()
+class SignInDialog(QDialog):
+    signInAccepted = Signal(str)
+    signInRejected = Signal()
 
     validator = QRegExpValidator(QRegExp("[A-Za-z0-9_]{6,15}"))
 
     def __init__(self, parent=None):
-        super(LoginDialog, self).__init__(parent)
+        super(SignInDialog, self).__init__(parent)
 
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
 
         self.username = ""
 
-        titleLabel = QtWidgets.QLabel("LOGIN")
+        titleLabel = QtWidgets.QLabel("Sign in")
         titleLabel.setAlignment(Qt.AlignCenter)
         titleLabel.setMinimumHeight(35)
 
@@ -44,43 +44,49 @@ class LoginDialog(QDialog):
         self.usernameLineEdit.setValidator(self.validator)
         self.usernameLineEdit.textChanged.connect(self.onUsernameTextChanged)
 
-        rememberMeCheckBox = QtWidgets.QCheckBox("Remember me")
-        rememberMeCheckBox.setMinimumHeight(35)
-
-        self.loginButton = QtWidgets.QPushButton("Login")
-        self.loginButton.clicked.connect(self.loginButtonClicked)
-        self.loginButton.setDefault(True)
-        self.loginButton.setMinimumHeight(35)
-        self.loginButton.setDisabled(True)
+        self.signInButton = QtWidgets.QPushButton("Sign in")
+        self.signInButton.clicked.connect(self.signInButtonClicked)
+        self.signInButton.setDefault(True)
+        self.signInButton.setMinimumHeight(35)
+        self.signInButton.setDisabled(True)
 
         self.cancelButton = QtWidgets.QPushButton("Cancel")
-        self.cancelButton.clicked.connect(self.loginRejected.emit)
+        self.cancelButton.clicked.connect(self.signInRejected.emit)
         self.cancelButton.setMinimumHeight(35)
 
         layout = QtWidgets.QFormLayout()
         layout.addRow(titleLabel)
         layout.addRow(self.usernameLineEdit)
-        layout.addRow(rememberMeCheckBox)
-        layout.addRow(self.cancelButton, self.loginButton)
+        layout.addRow(self.cancelButton, self.signInButton)
         layout.setAlignment(titleLabel, Qt.AlignCenter)
         self.setLayout(layout)
 
-        self.loginRejected.connect(self.reject)
+        self.signInRejected.connect(self.reject)
 
     @Slot()
     def onUsernameTextChanged(self, text):
         if len(text) < 6:
-            if self.loginButton.isEnabled():
-                self.loginButton.setDisabled(True)
-        elif not self.loginButton.isEnabled():
-            self.loginButton.setEnabled(True)
+            if self.signInButton.isEnabled():
+                self.signInButton.setDisabled(True)
+        elif not self.signInButton.isEnabled():
+            self.signInButton.setEnabled(True)
 
     @Slot()
-    def loginButtonClicked(self):
+    def signInButtonClicked(self):
         if self.usernameLineEdit.validator().validate(self.usernameLineEdit.text(), 0):
             self.username = self.usernameLineEdit.text()
-            self.loginAccepted.emit(self.username)
+            self.signInAccepted.emit(self.username)
             self.accept()
+
+    @staticmethod
+    def signIn(parent=None) -> str:
+        signInDialog = SignInDialog(parent)
+        status = signInDialog.exec_()
+
+        if status == SignInDialog.Rejected:
+            raise InvalidUsername()
+
+        return signInDialog.username
 
 
 class WaitDialog(QtWidgets.QDialog):

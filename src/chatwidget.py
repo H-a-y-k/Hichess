@@ -1,8 +1,10 @@
 import PySide2.QtWidgets as QtWidgets
 from PySide2.QtCore import Qt, Signal, Slot
-from PySide2.QtGui import QTextOption, QFontMetrics
+from PySide2.QtGui import QTextOption, QFontMetrics, QKeySequence
 from enum import Enum
 import time
+
+import textwrap
 
 
 class Sender(Enum):
@@ -24,14 +26,15 @@ class MessageWidget(QtWidgets.QTextBrowser):
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        self.setText(message)
+        self.setPlainText(message)
 
     @Slot()
     def sizeChanged(self, newSize):
         fm = QFontMetrics(self.font())
-        self.setFixedWidth(min([fm.horizontalAdvance(self.toPlainText())+10, newSize.toSize().width()]))
-        self.setFixedHeight(newSize.height()+5)
+        self.setMaximumWidth(max(min([fm.horizontalAdvance(self.toPlainText())+10, newSize.toSize().width()+10]), 40))
+        if self.width() < self.document().textWidth():
+            self.document().setTextWidth(self.width())
+        self.setFixedHeight(newSize.height()+2)
 
     def focusOutEvent(self, event):
         cursor = self.textCursor()
@@ -40,6 +43,8 @@ class MessageWidget(QtWidgets.QTextBrowser):
 
 
 class MessageInputWidget(QtWidgets.QTextEdit):
+    returnPressed = Signal()
+
     def __init__(self, parent=None):
         super(MessageInputWidget, self).__init__(parent)
 
@@ -51,14 +56,16 @@ class MessageInputWidget(QtWidgets.QTextEdit):
     @Slot()
     def sizeChanged(self, newSize):
         if newSize.height() < 300:
-            self.setMinimumHeight(newSize.height() + 5)
+            self.setMinimumHeight(newSize.height() + 20)
+        else:
+            self.setMinimumHeight(300)
 
 
 class ChatWidget(QtWidgets.QDockWidget):
     messageToBeSent = Signal(str)
 
     def __init__(self, parent=None):
-        super(ChatWidget, self).__init__(parent)
+        super(ChatWidget, self).__init__(parent=parent, flags=Qt.Window)
 
         self.time = ""
         self.setMinimumWidth(300)
@@ -69,8 +76,10 @@ class ChatWidget(QtWidgets.QDockWidget):
 
         self.scrollArea = QtWidgets.QScrollArea()
         self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         self.chat = QtWidgets.QWidget()
+        self.scrollArea.setFocusPolicy(Qt.NoFocus)
         self.chatLayout = QtWidgets.QVBoxLayout()
         self.chatLayout.setAlignment(Qt.AlignTop)
 
@@ -78,9 +87,9 @@ class ChatWidget(QtWidgets.QDockWidget):
         self.messageInputWidget.setSizePolicy(QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Ignored
         ))
+
         self.sendButton = QtWidgets.QPushButton("Send")
         self.sendButton.clicked.connect(self.sendMessage)
-        self.sendButton.setFocusPolicy(Qt.StrongFocus)
 
         self.messageInputLayout = QtWidgets.QHBoxLayout()
         self.messageInputLayout.addWidget(self.messageInputWidget)
@@ -95,15 +104,32 @@ class ChatWidget(QtWidgets.QDockWidget):
         self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.setSpacing(0)
 
+        self.lastMessageSender = None
+
+        self.scrollArea.verticalScrollBar().rangeChanged.connect(self.onRangeChanged)
+
         self.chat.setLayout(self.chatLayout)
         self.scrollArea.setWidget(self.chat)
         self.container.setLayout(self.mainLayout)
         self.setWidget(self.container)
 
+        self.setFocusProxy(self.messageInputWidget)
+
+    @Slot()
+    def onRangeChanged(self, min, max):
+        if self.lastMessageSender == YOU:
+            self.lastMessageSender = None
+            self.scrollArea.verticalScrollBar().setValue(max)
+
     @Slot()
     def sendMessage(self):
-        self.showMessage(YOU, self.messageInputWidget.toPlainText())
-        self.messageToBeSent.emit(self.messageInputWidget.toPlainText())
+        text = self.messageInputWidget.toPlainText()
+        wrapped = textwrap.wrap(text, 1600)
+        for chunk in wrapped:
+            self.showMessage(YOU, chunk)
+            self.messageToBeSent.emit(chunk)
+        self.messageInputWidget.clear()
+        self.messageInputWidget.setFocus()
 
     def showMessage(self, sender: Sender, message: str) -> None:
         if self.time != time.strftime("%I:%M %p"):
@@ -114,6 +140,8 @@ class ChatWidget(QtWidgets.QDockWidget):
             ))
             timeLabel.setAlignment(Qt.AlignCenter)
             self.chatLayout.addWidget(timeLabel)
+
+        self.lastMessageSender = sender
 
         messageWidget = MessageWidget(message)
 

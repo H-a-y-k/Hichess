@@ -101,3 +101,23 @@ CellWidget[marked=false] {}
 #cell_black_queen {
     border-image: url(:/images/black_queen.png)  0 0 0 0  stretch stretch;
 }
+
+QWidget {
+    font: semibold;
+    font-size: 15px;
+}
+
+QPushButton {
+    font-size: 17px;
+}
+
+QStatusBar {
+    font-size: 17px;
+}
+
+QTextBrowser {
+    font-size: 17px;
+    border: none;
+    background-color: rgb(40, 80, 120);
+    border-radius: 5px;
+}
