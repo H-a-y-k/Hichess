@@ -84,7 +84,6 @@ class HichessGui(QtWidgets.QMainWindow):
         self.toolbar = QtWidgets.QToolBar()
         self.backAction = QtWidgets.QAction(QIcon(":/images/back.png"), "Back")
         self.fullscreenAction = QtWidgets.QAction(QIcon(":/images/fullscreen.png"), "Fullscreen")
-        self.themeAction = QtWidgets.QAction(QIcon(":/images/lighttheme.png"), "Theme")
         self.zenModeAction = QtWidgets.QAction(QIcon(":/images/zenmode.png"), "Zenmode")
         self.copyFenAction = QtWidgets.QAction(QIcon(":/images/copy.png"), "Copy Fen")
 
@@ -95,7 +94,6 @@ class HichessGui(QtWidgets.QMainWindow):
 
         self.toolbar.addAction(self.backAction)
         self.toolbar.addAction(self.fullscreenAction)
-        self.toolbar.addAction(self.themeAction)
         self.toolbar.addAction(self.zenModeAction)
         self.toolbar.addAction(self.copyFenAction)
 
