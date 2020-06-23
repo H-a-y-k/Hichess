@@ -44,7 +44,7 @@ class HichessGui(QtWidgets.QMainWindow):
         self.statusBar().show()
 
         self.stackedWidget = QtWidgets.QStackedWidget()
-        self.boardWidget = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES)
+        self.boardWidget = hichess.BoardWidget(flipped=False, sides=hichess.BOTH_SIDES, dnd=True)
         self.boardWidget.setBoardPixmap(defaultPixmap=QPixmap(":/images/chessboard.png"),
                                         flippedPixmap=QPixmap(":/images/flipped_chessboard.png"))
         self.boardWidget.setFocusPolicy(Qt.StrongFocus)
