@@ -1,9 +1,10 @@
 import PySide2.QtWidgets as QtWidgets
 from PySide2.QtCore import Qt, Signal, Slot
-from PySide2.QtGui import QTextOption, QFontMetrics, QKeySequence
+from PySide2.QtGui import QTextOption, QFontMetrics, QIcon
 from enum import Enum
 import time
 
+import resources
 import textwrap
 
 
@@ -84,11 +85,14 @@ class ChatWidget(QtWidgets.QDockWidget):
         self.chatLayout.setAlignment(Qt.AlignTop)
 
         self.messageInputWidget = MessageInputWidget()
+        self.messageInputWidget.setPlaceholderText("Type a message here...")
         self.messageInputWidget.setSizePolicy(QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Ignored
         ))
 
-        self.sendButton = QtWidgets.QPushButton("Send")
+        self.sendButton = QtWidgets.QPushButton()
+        self.sendButton.setStyleSheet("background: lightblue; border: solid lightblue; border-radius: 12px;")
+        self.sendButton.setIcon(QIcon(":/images/send.png"))
         self.sendButton.clicked.connect(self.sendMessage)
 
         self.messageInputLayout = QtWidgets.QHBoxLayout()

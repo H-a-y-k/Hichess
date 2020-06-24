@@ -12,6 +12,12 @@ class GameControlPanel(QWidget):
         self.nextMoveButton = QPushButton(">")
         self.toCurrentFenButton = QPushButton(">>")
 
+        self.flipButton.setFixedWidth(45)
+        self.toStartFenButton.setFixedWidth(45)
+        self.previousMoveButton.setFixedWidth(45)
+        self.nextMoveButton.setFixedWidth(45)
+        self.toStartFenButton.setFixedWidth(45)
+
         self.toStartFenButton.setDisabled(True)
         self.previousMoveButton.setDisabled(True)
         self.nextMoveButton.setDisabled(True)
@@ -25,7 +31,7 @@ class GameControlPanel(QWidget):
         self.toolButtonsLayout.addWidget(self.nextMoveButton)
         self.toolButtonsLayout.addWidget(self.toCurrentFenButton)
         self.toolButtonsLayout.addStretch()
-        self.toolButtonsLayout.setSpacing(12)
+        self.toolButtonsLayout.setSpacing(14)
 
         self.nextColumn = 0
 
@@ -37,7 +43,7 @@ class GameControlPanel(QWidget):
         self.moveTable.setFocusPolicy(Qt.NoFocus)
         self.moveTable.setSelectionMode(QTableWidget.SingleSelection)
         self.moveTable.currentCellChanged.connect(self.onCurrentChanged)
-
+        self.moveTable.setFixedWidth(300)
         self.moveTable.setColumnCount(2)
         self.moveTable.horizontalHeader().hide()
 

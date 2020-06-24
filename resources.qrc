@@ -20,6 +20,7 @@
         <file>images/lighttheme.png</file>
         <file>images/zenmode.png</file>
         <file>images/copy.png</file>
+        <file>images/send.png</file>
         <file>font/bahnschrift.ttf</file>
   </qresource>
 </RCC>
