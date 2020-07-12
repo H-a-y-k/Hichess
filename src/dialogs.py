@@ -1,6 +1,6 @@
 import PySide2.QtWidgets as QtWidgets
 from PySide2.QtWidgets import QDialog
-from PySide2.QtCore import Qt, Signal, Slot, QRegExp
+from PySide2.QtCore import Qt, Signal, Slot, QRegExp, QFile, QFileInfo, QDir
 from PySide2.QtGui import QRegExpValidator, QPixmap
 
 import random
@@ -17,76 +17,26 @@ class HLineWidget(QtWidgets.QFrame):
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
 
-class InvalidUsername(Exception):
-    pass
+class _EngineEdit(QtWidgets.QWidget):
+    def __init__(self, path, parent=None):
+        super(_EngineEdit, self).__init__(parent)
 
+        self.pathEdit = QtWidgets.QLineEdit(path)
+        self.pathEdit.setPlaceholderText("Path")
 
-class SignInDialog(QDialog):
-    signInAccepted = Signal(str)
-    signInRejected = Signal()
+        self.browseButton = QtWidgets.QPushButton("Browse")
+        self.browseButton.clicked.connect(self.browse)
 
-    validator = QRegExpValidator(QRegExp("[A-Za-z0-9_]{6,15}"))
-
-    def __init__(self, parent=None):
-        super(SignInDialog, self).__init__(parent)
-
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-
-        self.username = ""
-
-        titleLabel = QtWidgets.QLabel("Sign in")
-        titleLabel.setAlignment(Qt.AlignCenter)
-        titleLabel.setMinimumHeight(35)
-
-        self.usernameLineEdit = QtWidgets.QLineEdit()
-        self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
-        self.usernameLineEdit.setMinimumHeight(35)
-        self.usernameLineEdit.setValidator(self.validator)
-        self.usernameLineEdit.textChanged.connect(self.onUsernameTextChanged)
-
-        self.signInButton = QtWidgets.QPushButton("Sign in")
-        self.signInButton.clicked.connect(self.signInButtonClicked)
-        self.signInButton.setDefault(True)
-        self.signInButton.setMinimumHeight(35)
-        self.signInButton.setDisabled(True)
-
-        self.cancelButton = QtWidgets.QPushButton("Cancel")
-        self.cancelButton.clicked.connect(self.signInRejected.emit)
-        self.cancelButton.setMinimumHeight(35)
-
-        layout = QtWidgets.QFormLayout()
-        layout.addRow(titleLabel)
-        layout.addRow(self.usernameLineEdit)
-        layout.addRow(self.cancelButton, self.signInButton)
-        layout.setAlignment(titleLabel, Qt.AlignCenter)
-        self.setLayout(layout)
-
-        self.signInRejected.connect(self.reject)
+        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.addWidget(self.pathEdit)
+        self.mainLayout.addWidget(self.browseButton)
+        self.setLayout(self.mainLayout)
 
     @Slot()
-    def onUsernameTextChanged(self, text):
-        if len(text) < 6:
-            if self.signInButton.isEnabled():
-                self.signInButton.setDisabled(True)
-        elif not self.signInButton.isEnabled():
-            self.signInButton.setEnabled(True)
-
-    @Slot()
-    def signInButtonClicked(self):
-        if self.usernameLineEdit.validator().validate(self.usernameLineEdit.text(), 0):
-            self.username = self.usernameLineEdit.text()
-            self.signInAccepted.emit(self.username)
-            self.accept()
-
-    @staticmethod
-    def signIn(parent=None) -> str:
-        signInDialog = SignInDialog(parent)
-        status = signInDialog.exec_()
-
-        if status == SignInDialog.Rejected:
-            raise InvalidUsername()
-
-        return signInDialog.username
+    def browse(self):
+        filename = QtWidgets.QFileDialog.getOpenFileName(self, "Choose Engine", QDir.currentPath())
+        self.pathEdit.setText(filename[0])
 
 
 class WaitDialog(QtWidgets.QDialog):
@@ -104,13 +54,14 @@ class WaitDialog(QtWidgets.QDialog):
         self.setLayout(waitDialogLayout)
 
 
-class ChooseVariantSection(QtWidgets.QWidget):
+class _ChooseVariantSection(QtWidgets.QGroupBox):
     variantSelected = Signal(str)
 
     def __init__(self, parent=None):
-        super(ChooseVariantSection, self).__init__(parent)
+        super(_ChooseVariantSection, self).__init__(parent)
 
-        self.layout = QtWidgets.QFormLayout()
+        self.setTitle("Variant")
+        self.mainLayout = QtWidgets.QVBoxLayout()
 
         self.variantComboBox = QtWidgets.QComboBox()
         self.variantComboBox.addItem("Standard")
@@ -125,11 +76,11 @@ class ChooseVariantSection(QtWidgets.QWidget):
 
         self.fromPositionLineEdit.textChanged.connect(self.updatePreviewBoardWidget)
 
-        self.layout.addRow("Variant", self.variantComboBox)
-        self.layout.addRow("", self.fromPositionLineEdit)
-        self.layout.addRow("", self.previewBoardWidget)
+        self.mainLayout.addWidget(self.variantComboBox)
+        self.mainLayout.addWidget(self.fromPositionLineEdit)
+        self.mainLayout.addWidget(self.previewBoardWidget)
 
-        self.setLayout(self.layout)
+        self.setLayout(self.mainLayout)
 
     @Slot(str)
     def onVariantSelected(self, name: str):
@@ -148,19 +99,13 @@ class ChooseVariantSection(QtWidgets.QWidget):
             pass
 
 
-class PveDialog(QDialog):
+class _ChooseLevelSection(QtWidgets.QGroupBox):
     def __init__(self, parent=None):
-        super(PveDialog, self).__init__(parent)
+        super(_ChooseLevelSection, self).__init__(parent)
 
-        self.data = {
-            "fen": chess.STARTING_FEN,
-            "level": 0,
-            "color": "white"
-        }
+        self.setTitle("Level")
 
-        self.layout = QtWidgets.QVBoxLayout()
-
-        self.chooseVariantSection = ChooseVariantSection()
+        self.mainLayout = QtWidgets.QVBoxLayout()
 
         self.levelComboBox = QtWidgets.QComboBox()
         self.levelComboBox.addItem("Very Easy")
@@ -172,6 +117,18 @@ class PveDialog(QDialog):
         self.levelComboBox.addItem("Hard 2")
         self.levelComboBox.addItem("Very Hard")
 
+        self.mainLayout.addWidget(self.levelComboBox)
+        self.setLayout(self.mainLayout)
+
+
+class _ChooseColorSection(QtWidgets.QGroupBox):
+    def __init__(self, parent=None):
+        super(_ChooseColorSection, self).__init__(parent)
+
+        self.setTitle("Color")
+
+        self.mainLayout = QtWidgets.QHBoxLayout()
+
         self.blackButton = QtWidgets.QPushButton("Black")
         self.randomButton = QtWidgets.QPushButton("Random")
         self.whiteButton = QtWidgets.QPushButton("White")
@@ -180,34 +137,130 @@ class PveDialog(QDialog):
         self.randomButton.setFocusPolicy(Qt.NoFocus)
         self.whiteButton.setFocusPolicy(Qt.NoFocus)
 
-        self.blackButton.clicked.connect(partial(self.doAccept, self.blackButton))
-        self.randomButton.clicked.connect(partial(self.doAccept, self.randomButton))
-        self.whiteButton.clicked.connect(partial(self.doAccept, self.whiteButton))
+        self.mainLayout.addWidget(self.blackButton)
+        self.mainLayout.addWidget(self.randomButton)
+        self.mainLayout.addWidget(self.whiteButton)
+        self.setLayout(self.mainLayout)
 
-        chooseColorLayout = QtWidgets.QHBoxLayout()
-        chooseColorLayout.addWidget(self.blackButton)
-        chooseColorLayout.addWidget(self.randomButton)
-        chooseColorLayout.addWidget(self.whiteButton)
 
-        self.layout.setSpacing(5)
+class PveDialog(QDialog):
+    def __init__(self, parent=None):
+        super(PveDialog, self).__init__(parent)
 
-        self.layout.addWidget(QtWidgets.QLabel("Play against the Computer"))
-        self.layout.addWidget(self.chooseVariantSection)
-        self.layout.addWidget(HLineWidget())
-        self.layout.addWidget(self.levelComboBox)
-        self.layout.addLayout(chooseColorLayout)
+        self.data = {
+            "fen": chess.STARTING_FEN,
+            "level": 0,
+            "color": "white"
+        }
 
-        self.setLayout(self.layout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+
+        self.chooseVariantSection = _ChooseVariantSection()
+        self.chooseLevelSection = _ChooseLevelSection()
+        self.chooseColorSection = _ChooseColorSection()
+
+        self.chooseColorSection.blackButton.clicked.connect(
+            partial(self.doAccept, self.chooseColorSection.blackButton))
+        self.chooseColorSection.randomButton.clicked.connect(
+            partial(self.doAccept, self.chooseColorSection.randomButton))
+        self.chooseColorSection.whiteButton.clicked.connect(
+            partial(self.doAccept, self.chooseColorSection.whiteButton))
+
+        self.mainLayout.setSpacing(10)
+
+        self.mainLayout.addWidget(self.chooseVariantSection)
+        self.mainLayout.addWidget(self.chooseLevelSection)
+        self.mainLayout.addWidget(self.chooseColorSection)
+
+        self.setLayout(self.mainLayout)
 
     @Slot(QtWidgets.QPushButton)
     def doAccept(self, colorButton):
         self.data["fen"] = self.chooseVariantSection.fromPositionLineEdit.text()
-        self.data["level"] = self.levelComboBox.currentIndex()
+        self.data["level"] = self.chooseLevelSection.levelComboBox.currentIndex()
 
         colorName = colorButton.text().lower()
         if colorButton.text().lower() == "random":
             self.data["color"] = random.choice([chess.WHITE, chess.BLACK])
         else:
-            self.data["color"] = colorName == "white"
+            self.data["color"] = (colorName == "white")
+
+        self.accept()
+
+
+class SettingsDialog(QtWidgets.QDialog):
+    validator = QRegExpValidator(QRegExp("[A-Za-z0-9_]{6,16}"))
+
+    def __init__(self, username, enginePath, parent=None):
+        super(SettingsDialog, self).__init__(parent)
+
+        self.newUsername = ""
+        self.newEnginePath = ""
+
+        self.mainLayout = QtWidgets.QFormLayout()
+
+        self.usernameLineEdit = QtWidgets.QLineEdit(username)
+        self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
+        self.usernameLineEdit.setMinimumHeight(35)
+        self.usernameLineEdit.setValidator(self.validator)
+        self.usernameLineEdit.textChanged.connect(self.validateFields)
+
+        self.engineEdit = _EngineEdit(enginePath)
+        self.engineEdit.pathEdit.textChanged.connect(self.validateFields)
+
+        buttonBox = QtWidgets.QDialogButtonBox()
+        self.okButton = buttonBox.addButton("Ok", QtWidgets.QDialogButtonBox.AcceptRole)
+        self.cancelButton = buttonBox.addButton("Cancel", QtWidgets.QDialogButtonBox.RejectRole)
+        self.okButton.clicked.connect(self._ok)
+        self.cancelButton.clicked.connect(self.reject)
+
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.setAlignment(Qt.AlignBottom)
+        self.mainLayout.addRow("Username", self.usernameLineEdit)
+        self.mainLayout.addRow("Engine", self.engineEdit)
+        self.mainLayout.addWidget(buttonBox)
+        self.setLayout(self.mainLayout)
+
+        self.validateFields()
+
+    def _validateEnginePath(self, path):
+        return QFile.exists(path) and QFileInfo(path).isFile()
+
+    @Slot(str)
+    def validateFields(self):
+        usernameValid = self.validator.validate(self.usernameLineEdit.text(), 0) and \
+                        6 <= len(self.usernameLineEdit.text()) <= 16
+        pathValid = self._validateEnginePath(self.engineEdit.pathEdit.text())
+
+        if not usernameValid or not pathValid:
+            if self.okButton.isEnabled():
+                self.okButton.setDisabled(True)
+        else:
+            if not self.okButton.isEnabled():
+                self.okButton.setDisabled(False)
+
+        if not usernameValid:
+            self.usernameLineEdit.setStyleSheet("border: 1px solid red;")
+        else:
+            self.usernameLineEdit.setStyleSheet("border: 1px solid green;")
+
+        if not pathValid:
+            self.engineEdit.pathEdit.setStyleSheet("border: 1px solid red;")
+        else:
+            self.engineEdit.pathEdit.setStyleSheet("border: 1px solid green;")
+
+    @Slot()
+    def _ok(self):
+        if self.validator.validate(self.usernameLineEdit.text(), 0):
+            self.newUsername = self.usernameLineEdit.text()
+        else:
+            QtWidgets.QMessageBox.critical(self, "Error", "Invalid username")
+            self.reject()
+
+        if self._validateEnginePath(self.engineEdit.pathEdit.text()):
+            self.newEnginePath = self.engineEdit.pathEdit.text()
+        else:
+            QtWidgets.QMessageBox.critical(self, "Error", "The specified engine's path does not exist.")
+            self.reject()
 
         self.accept()

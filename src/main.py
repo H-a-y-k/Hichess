@@ -1,8 +1,8 @@
 from PySide2.QtWidgets import QApplication
 from PySide2.QtCore import QFile, QTextStream
-from PySide2.QtGui import QFontDatabase
+from PySide2.QtGui import QFontDatabase, QIcon
 from hichess_gui import HichessGui
-from dialogs import SignInDialog, InvalidUsername
+from dialogs import SettingsDialog
 import logging
 import sys
 
@@ -14,7 +14,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     app = QApplication(sys.argv)
-
     breeze = QFile(":qbreeze/dark.qss")
     main = QFile(":/style/styles.css")
 
@@ -22,6 +21,7 @@ if __name__ == "__main__":
     mainQss = ""
 
     QFontDatabase.addApplicationFont(":/font/bahnschrift.ttf")
+    app.setWindowIcon(QIcon(":/images/chessboard.png"))
 
     if breeze.open(QFile.ReadOnly):
         textstream = QTextStream(breeze)
@@ -32,15 +32,12 @@ if __name__ == "__main__":
 
     app.setStyleSheet(f"{breezeQss}{mainQss}")
 
-    loginDialog = SignInDialog()
-    status = loginDialog.exec_()
+    settingsDialog = SettingsDialog("", "")
+    status = settingsDialog.exec_()
 
-    if status == SignInDialog.Accepted and loginDialog.validator.regExp().exactMatch(loginDialog.username):
-        window = HichessGui(username=loginDialog.username)
-
+    if status == SettingsDialog.Accepted:
+        window = HichessGui(username=settingsDialog.newUsername, enginePath=settingsDialog.newEnginePath)
         window.setMinimumSize(800, 800)
         window.showMaximized()
-    else:
-        raise InvalidUsername
 
     sys.exit(app.exec_())

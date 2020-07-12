@@ -21,9 +21,11 @@ from PySide2.QtCore import Qt, Slot, QEvent, QPoint
 from PySide2.QtGui import QPixmap, QIcon, QKeySequence, QResizeEvent
 from PySide2.QtNetwork import QAbstractSocket
 
-import hichess.hichess as hichess
+import hichess
 import chess
-from stockfish import Stockfish
+import chess.engine
+
+import asyncio
 
 from functools import partial
 
@@ -34,12 +36,15 @@ import chatwidget
 
 import pyperclip
 
+asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
+
 
 class HichessGui(QtWidgets.QMainWindow):
-    def __init__(self, username: str):
+    def __init__(self, username: str, enginePath: str):
         super(HichessGui, self).__init__()
 
         self.username = username
+        self.enginePath = enginePath
 
         self.statusBar().show()
 
@@ -66,8 +71,6 @@ class HichessGui(QtWidgets.QMainWindow):
         self.controlPanelWidget.toCurrentFenButton.clicked.connect(self.toCurrentFen)
         self.controlPanelWidget.moveTable.cellClicked.connect(self.onCellClicked)
 
-        self.stockfishEngine = None
-
         self.gameLayout = QtWidgets.QGridLayout()
 
         self.client = client.Client(self.username, self)
@@ -77,6 +80,7 @@ class HichessGui(QtWidgets.QMainWindow):
         self.client.webClient.connected.connect(self.onClientConnected)
         self.client.gameStarted.connect(self.startGame)
         self.client.moveMade.connect(self.onClientMoveMade)
+        self.client.webClient.error.connect(lambda error: QtWidgets.QMessageBox.critical(self, "Server", str(error)))
         self.waitDialog = dialogs.WaitDialog(self)
 
         self.chatWidget = chatwidget.ChatWidget()
@@ -120,16 +124,20 @@ class HichessGui(QtWidgets.QMainWindow):
         self.controlPanelWidget.reset()
         self.stackedWidget.setCurrentIndex(0)
 
-        if self.stockfishEngine:
+        if not self.boardWidget.engine.null():
             self.toolbar.hide()
             self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
-            self.stockfishEngine = None
+            self.boardWidget.engine.quit()
 
         if self.client.webClient.state() == QAbstractSocket.ConnectedState:
             self.client.webClient.close()
         if self.chatWidget.isVisible():
             self.chatWidget.close()
             self.chatWidget = chatwidget.ChatWidget()
+
+        self.removeDockWidget(self.chatWidget)
+        if not self.boardWidget.engine.null():
+            self.boardWidget.engine.quit()
 
     @Slot()
     def updateFullscreen(self):
@@ -162,16 +170,15 @@ class HichessGui(QtWidgets.QMainWindow):
     @Slot(str)
     def pveOnMoveMade(self, move):
         if not self.boardWidget.board.is_game_over():
-            self.stockfishEngine.set_fen_position(self.boardWidget.board.fen())
-
             color = (self.boardWidget.accessibleSides == hichess.ONLY_WHITE_SIDE)
 
             if self.boardWidget.board.turn != color:
-                self.boardWidget.push(chess.Move.from_uci(self.stockfishEngine.get_best_move()))
+                result = self.boardWidget.engine.playMove(self.boardWidget.board, chess.engine.Limit(time=0.1), True)
+                self.boardWidget.makeMove(result.move)
         else:
-            if self.stockfishEngine:
+            if not self.boardWidget.engine.null():
                 self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
-                self.stockfishEngine = None
+                self.boardWidget.engine.quit()
 
     @Slot()
     def onClientConnected(self):
@@ -181,8 +188,7 @@ class HichessGui(QtWidgets.QMainWindow):
     @Slot()
     def onClientErrorReceived(self, error):
         if error == QAbstractSocket.SocketTimeoutError or error == QAbstractSocket.ConnectionRefusedError:
-            QtWidgets.QMessageBox.warning(self, "Error",
-                                          "Couldn't connect to the server")
+            QtWidgets.QMessageBox.critical(self, "Error", "Couldn't connect to the server")
         elif error == QAbstractSocket.RemoteHostClosedError:
             self.boardWidget.accessibleSides = hichess.BOTH_SIDES
             self.boardWidget.blockBoardOnPop = False
@@ -190,11 +196,10 @@ class HichessGui(QtWidgets.QMainWindow):
 
     @Slot(str)
     def onServerError(self, error):
-        QtWidgets.QMessageBox.warning(self, "Server", error)
+        QtWidgets.QMessageBox.critical(self, "Server", error)
         if self.waitDialog.isVisible():
             self.waitDialog.close()
         self.client.webClient.abort()
-        self.username = dialogs.SignInDialog.signIn(self)
 
     @Slot()
     def onCheckmate(self, side):
@@ -217,32 +222,35 @@ class HichessGui(QtWidgets.QMainWindow):
         if self.client.webClient.state() == QAbstractSocket.ConnectedState:
             self.client.webClient.close(0)
 
+        if not self.boardWidget.engine.null():
+            self.boardWidget.engine.quit()
+
     def setupMainMenuScene(self):
         menuScene = QtWidgets.QWidget()
 
         pveButton = QtWidgets.QPushButton("Against the Computer")
         offlinePvpButton = QtWidgets.QPushButton("Offline Pvp")
         onlinePvpButton = QtWidgets.QPushButton("Online PvP")
+        settingsButton = QtWidgets.QPushButton("Settings")
         exitButton = QtWidgets.QPushButton("Exit")
 
-        pveButton.setFixedWidth(250)
-        pveButton.setFixedHeight(40)
-        offlinePvpButton.setFixedWidth(250)
-        offlinePvpButton.setFixedHeight(40)
-        onlinePvpButton.setFixedWidth(250)
-        onlinePvpButton.setFixedHeight(40)
-        exitButton.setFixedWidth(250)
-        exitButton.setFixedHeight(40)
+        pveButton.setFixedSize(250, 40)
+        offlinePvpButton.setFixedSize(250, 40)
+        onlinePvpButton.setFixedSize(250, 40)
+        settingsButton.setFixedSize(250, 40)
+        exitButton.setFixedSize(250, 40)
 
         pveButton.clicked.connect(self.playPve)
         offlinePvpButton.clicked.connect(self.playOfflinePvp)
         onlinePvpButton.clicked.connect(self.playOnlinePvp)
+        settingsButton.clicked.connect(self.settings)
         exitButton.clicked.connect(self.close)
 
         menuSceneLayout = QtWidgets.QVBoxLayout()
         menuSceneLayout.addWidget(pveButton)
         menuSceneLayout.addWidget(offlinePvpButton)
         menuSceneLayout.addWidget(onlinePvpButton)
+        menuSceneLayout.addWidget(settingsButton)
         menuSceneLayout.addWidget(exitButton)
         menuSceneLayout.setSpacing(20)
         menuSceneLayout.setAlignment(Qt.AlignCenter)
@@ -347,16 +355,11 @@ class HichessGui(QtWidgets.QMainWindow):
 
             SKILL_LEVELS = [0, 4, 8, 12, 14, 16, 18, 20]
             fen, level, color = pveDialog.data.values()
+
+            self.boardWidget.engine.start(self.enginePath,
+                                          {"Skill level": SKILL_LEVELS[level]})
+
             self.controlPanelWidget.firstName.setText(f"Stockfish {SKILL_LEVELS[level]}")
-
-            self.stockfishEngine = Stockfish()
-
-            # fen
-            self.stockfishEngine.set_fen_position(fen)
-
-            # level
-            self.stockfishEngine.set_skill_level(SKILL_LEVELS[level])
-
             self.boardWidget.moveMade.connect(self.pveOnMoveMade)
 
             # color
@@ -367,15 +370,18 @@ class HichessGui(QtWidgets.QMainWindow):
                 self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
                 self.boardWidget.flipped = True
 
-            self.stockfishEngine.set_fen_position(self.boardWidget.board.fen())
             if self.boardWidget.board.turn != color:
-                self.boardWidget.push(chess.Move.from_uci(self.stockfishEngine.get_best_move()))
+                result = self.boardWidget.engine.playMove(board=self.boardWidget.board,
+                                                          limit=chess.engine.Limit(time=60),
+                                                          ponder=level > 4)
+                self.boardWidget.makeMove(result.move)
 
             self.stackedWidget.setCurrentIndex(1)
 
     @Slot()
     def playOfflinePvp(self):
         self.toolbar.show()
+
         self.boardWidget.blockBoardOnPop = False
         self.boardWidget.accessibleSides = hichess.BOTH_SIDES
         self.controlPanelWidget.moveTable.setDisabled(True)
@@ -383,8 +389,8 @@ class HichessGui(QtWidgets.QMainWindow):
 
     @Slot()
     def playOnlinePvp(self):
-        if not dialogs.SignInDialog.validator.validate(self.username, 0):
-            self.username = dialogs.SignInDialog.signIn(self)
+        if not dialogs.SettingsDialog.validator.validate(self.username, 0):
+            QtWidgets.QMessageBox.warning(self, "Server", "There's already a player with that username.")
         self.client.username = self.username
         self.client.startConnectionWithServer()
 
@@ -430,6 +436,14 @@ class HichessGui(QtWidgets.QMainWindow):
             self.boardWidget.popStack.appendleft(chess.Move.from_uci(move))
             self.controlPanelWidget.addMove(move)
 
+    def settings(self):
+        settingsDialog = dialogs.SettingsDialog(username=self.username, enginePath=self.enginePath, parent=self)
+        status = settingsDialog.exec_()
+
+        if status == dialogs.SettingsDialog.Accepted:
+            self.username = settingsDialog.newUsername
+            self.enginePath = settingsDialog.newEnginePath
+
     def eventFilter(self, watched: QtWidgets.QWidget, event: QResizeEvent):
         if event.type() == QEvent.Type.Resize:
             h = event.size().height()
@@ -451,3 +465,7 @@ class HichessGui(QtWidgets.QMainWindow):
         elif event.key() == Qt.Key_Right:
             if self.boardWidget.popStack:
                 self.nextMove()
+
+    def closeEvent(self, event):
+        if not self.boardWidget.engine.null():
+            self.boardWidget.engine.quit()
