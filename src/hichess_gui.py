@@ -124,10 +124,10 @@ class HichessGui(QtWidgets.QMainWindow):
         self.controlPanelWidget.reset()
         self.stackedWidget.setCurrentIndex(0)
 
-        if not self.boardWidget.engine.null():
+        if not self.boardWidget.engineWrapper.null():
             self.toolbar.hide()
             self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
-            self.boardWidget.engine.quit()
+            self.boardWidget.engineWrapper.quit()
 
         if self.client.webClient.state() == QAbstractSocket.ConnectedState:
             self.client.webClient.close()
@@ -136,8 +136,8 @@ class HichessGui(QtWidgets.QMainWindow):
             self.chatWidget = chatwidget.ChatWidget()
 
         self.removeDockWidget(self.chatWidget)
-        if not self.boardWidget.engine.null():
-            self.boardWidget.engine.quit()
+        if not self.boardWidget.engineWrapper.null():
+            self.boardWidget.engineWrapper.quit()
 
     @Slot()
     def updateFullscreen(self):
@@ -173,12 +173,12 @@ class HichessGui(QtWidgets.QMainWindow):
             color = (self.boardWidget.accessibleSides == hichess.ONLY_WHITE_SIDE)
 
             if self.boardWidget.board.turn != color:
-                result = self.boardWidget.engine.playMove(self.boardWidget.board, chess.engine.Limit(time=0.1), True)
+                result = self.boardWidget.engineWrapper.playMove(self.boardWidget.board, chess.engine.Limit(time=0.1), True)
                 self.boardWidget.makeMove(result.move)
         else:
-            if not self.boardWidget.engine.null():
+            if not self.boardWidget.engineWrapper.null():
                 self.boardWidget.moveMade.disconnect(self.pveOnMoveMade)
-                self.boardWidget.engine.quit()
+                self.boardWidget.engineWrapper.quit()
 
     @Slot()
     def onClientConnected(self):
@@ -222,8 +222,8 @@ class HichessGui(QtWidgets.QMainWindow):
         if self.client.webClient.state() == QAbstractSocket.ConnectedState:
             self.client.webClient.close(0)
 
-        if not self.boardWidget.engine.null():
-            self.boardWidget.engine.quit()
+        if not self.boardWidget.engineWrapper.null():
+            self.boardWidget.engineWrapper.quit()
 
     def setupMainMenuScene(self):
         menuScene = QtWidgets.QWidget()
@@ -356,7 +356,7 @@ class HichessGui(QtWidgets.QMainWindow):
             SKILL_LEVELS = [0, 4, 8, 12, 14, 16, 18, 20]
             fen, level, color = pveDialog.data.values()
 
-            self.boardWidget.engine.start(self.enginePath,
+            self.boardWidget.engineWrapper.start(self.enginePath,
                                           {"Skill level": SKILL_LEVELS[level]})
 
             self.controlPanelWidget.firstName.setText(f"Stockfish {SKILL_LEVELS[level]}")
@@ -371,7 +371,7 @@ class HichessGui(QtWidgets.QMainWindow):
                 self.boardWidget.flipped = True
 
             if self.boardWidget.board.turn != color:
-                result = self.boardWidget.engine.playMove(board=self.boardWidget.board,
+                result = self.boardWidget.engineWrapper.playMove(board=self.boardWidget.board,
                                                           limit=chess.engine.Limit(time=60),
                                                           ponder=level > 4)
                 self.boardWidget.makeMove(result.move)
@@ -467,5 +467,5 @@ class HichessGui(QtWidgets.QMainWindow):
                 self.nextMove()
 
     def closeEvent(self, event):
-        if not self.boardWidget.engine.null():
-            self.boardWidget.engine.quit()
+        if not self.boardWidget.engineWrapper.null():
+            self.boardWidget.engineWrapper.quit()
