@@ -6,6 +6,7 @@ class GameControlPanel(QWidget):
     def __init__(self, first: str, second: str, parent=None):
         super(GameControlPanel, self).__init__(parent)
 
+        # buttons on the top
         self.flipButton = QPushButton("*")
         self.toStartFenButton = QPushButton("<<")
         self.previousMoveButton = QPushButton("<")
@@ -33,10 +34,13 @@ class GameControlPanel(QWidget):
         self.toolButtonsLayout.addStretch()
         self.toolButtonsLayout.setSpacing(14)
 
+        # the column that contains the first empty cell.
         self.nextColumn = 0
 
+        self.firstMaterial = QLabel()
         self.firstName = QLabel(first)
         self.secondName = QLabel(second)
+        self.secondMaterial = QLabel()
 
         self.moveTable = QTableWidget()
         self.moveTable.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -51,10 +55,12 @@ class GameControlPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         layout.addStretch()
+        layout.addWidget(self.firstMaterial)
         layout.addLayout(self.toolButtonsLayout)
         layout.addWidget(self.firstName)
         layout.addWidget(self.moveTable)
         layout.addWidget(self.secondName)
+        layout.addWidget(self.secondMaterial)
         layout.addStretch()
         layout.setSpacing(0)
 
@@ -136,7 +142,11 @@ class GameControlPanel(QWidget):
                 self.moveTable.setRowCount(self.moveTable.rowCount()-1)
 
     def swapNames(self):
-        temp = self.firstName.text()
+        tempFirstMaterial = self.firstMaterial.text()
+        tempFirstName = self.firstName.text()
 
+        self.firstMaterial.setText(self.secondMaterial.text())
+        self.secondMaterial.setText(tempFirstMaterial)
         self.firstName.setText(self.secondName.text())
-        self.secondName.setText(temp)
+        self.secondName.setText(tempFirstName)
+

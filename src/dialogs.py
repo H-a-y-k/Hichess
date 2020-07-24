@@ -1,6 +1,6 @@
 import PySide2.QtWidgets as QtWidgets
 from PySide2.QtWidgets import QDialog
-from PySide2.QtCore import Qt, Signal, Slot, QRegExp, QFile, QFileInfo, QDir
+from PySide2.QtCore import Qt, Signal, Slot, QRegExp, QFile, QFileInfo, QDir, QSettings, QStandardPaths
 from PySide2.QtGui import QRegExpValidator, QPixmap
 
 import random
@@ -191,22 +191,37 @@ class PveDialog(QDialog):
 class SettingsDialog(QtWidgets.QDialog):
     validator = QRegExpValidator(QRegExp("[A-Za-z0-9_]{6,16}"))
 
-    def __init__(self, username, enginePath, parent=None):
+    def __init__(self, parent=None):
         super(SettingsDialog, self).__init__(parent)
+
+        self.settings = QSettings(QStandardPaths.writableLocation(QStandardPaths.ConfigLocation)
+                                  + "/settings.ini", QSettings.IniFormat)
+
+        self.usernames = set()
+        self.engines = set()
 
         self.newUsername = ""
         self.newEnginePath = ""
 
+        self._loadSettings()
+
         self.mainLayout = QtWidgets.QFormLayout()
 
-        self.usernameLineEdit = QtWidgets.QLineEdit(username)
+        self.usernameLineEdit = QtWidgets.QLineEdit(self.newUsername)
         self.usernameLineEdit.setPlaceholderText("Username (a-zA-Z0-9_)")
         self.usernameLineEdit.setMinimumHeight(35)
         self.usernameLineEdit.setValidator(self.validator)
         self.usernameLineEdit.textChanged.connect(self.validateFields)
+        self.usernameLineEdit.selectAll()
+        self.usernameLineEdit.setCompleter(QtWidgets.QCompleter(list(self.usernames), self))
 
-        self.engineEdit = _EngineEdit(enginePath)
+        self.engineEdit = _EngineEdit(self.newEnginePath)
         self.engineEdit.pathEdit.textChanged.connect(self.validateFields)
+        self.engineEdit.pathEdit.selectAll()
+        self.engineEdit.pathEdit.setCompleter(QtWidgets.QCompleter(list(self.engines), self))
+
+        self.resetButton = QtWidgets.QPushButton("Reset")
+        self.resetButton.clicked.connect(self._reset)
 
         buttonBox = QtWidgets.QDialogButtonBox()
         self.okButton = buttonBox.addButton("Ok", QtWidgets.QDialogButtonBox.AcceptRole)
@@ -218,6 +233,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.mainLayout.setAlignment(Qt.AlignBottom)
         self.mainLayout.addRow("Username", self.usernameLineEdit)
         self.mainLayout.addRow("Engine", self.engineEdit)
+        self.mainLayout.addWidget(self.resetButton)
         self.mainLayout.addWidget(buttonBox)
         self.setLayout(self.mainLayout)
 
@@ -249,6 +265,39 @@ class SettingsDialog(QtWidgets.QDialog):
         else:
             self.engineEdit.pathEdit.setStyleSheet("border: 1px solid green;")
 
+    def _loadSettings(self):
+        i = self.settings.beginReadArray("usernames")
+        currentUsername = ""
+        for j in range(i):
+            self.settings.setArrayIndex(j)
+            currentUsername = self.settings.value("usernames", "")
+            self.usernames.add(currentUsername)
+        self.newUsername = currentUsername
+        self.settings.endArray()
+
+        i = self.settings.beginReadArray("engines")
+        currentEngine = ""
+        for j in range(i):
+            self.settings.setArrayIndex(j)
+            currentEngine = self.settings.value("engines", "")
+            self.engines.add(currentEngine)
+        self.newEnginePath = currentEngine
+        self.settings.endArray()
+
+    @Slot()
+    def _reset(self):
+        status = QtWidgets.QMessageBox.warning(self, "Reset", "Are you sure to reset the settings?",
+                                               buttons=QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Ok,
+                                               defaultButton=QtWidgets.QMessageBox.Ok)
+
+        if status == QtWidgets.QMessageBox.Ok:
+            self.usernameLineEdit.clear()
+            self.engineEdit.pathEdit.clear()
+            self.usernames.clear()
+            self.engines.clear()
+            self.settings.clear()
+            self._loadSettings()
+
     @Slot()
     def _ok(self):
         if self.validator.validate(self.usernameLineEdit.text(), 0):
@@ -262,5 +311,19 @@ class SettingsDialog(QtWidgets.QDialog):
         else:
             QtWidgets.QMessageBox.critical(self, "Error", "The specified engine's path does not exist.")
             self.reject()
+
+        self.settings.beginWriteArray("usernames")
+        self.usernames.add(self.newUsername)
+        for i, username in enumerate(self.usernames):
+            self.settings.setArrayIndex(i)
+            self.settings.setValue("usernames", username)
+        self.settings.endArray()
+
+        self.settings.beginWriteArray("engines")
+        self.engines.add(self.newEnginePath)
+        for i, path in enumerate(self.engines):
+            self.settings.setArrayIndex(i)
+            self.settings.setValue("engines", path)
+        self.settings.endArray()
 
         self.accept()

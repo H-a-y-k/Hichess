@@ -117,6 +117,7 @@ class HichessGui(QtWidgets.QMainWindow):
 
     @Slot()
     def toMainMenu(self):
+        self.controlPanelWidget.moveTable.setSelectionMode(QtWidgets.QListWidget.SingleSelection)
         self.toolbar.hide()
 
         self.boardWidget.reset()
@@ -330,6 +331,21 @@ class HichessGui(QtWidgets.QMainWindow):
             moveNumber = row * 2 + column
             self.boardWidget.goToMove(moveNumber+1)
 
+        if not self.boardWidget.blockBoardOnPop and not self.controlPanelWidget.isLive():
+            self.controlPanelWidget.previousMoveButton.setDisabled(True)
+            self.controlPanelWidget.toStartFenButton.setDisabled(True)
+            self.controlPanelWidget.nextMoveButton.setDisabled(True)
+            self.controlPanelWidget.toCurrentFenButton.setDisabled(True)
+            self.boardWidget.accessibleSides = hichess.NO_SIDE
+        else:
+            if self.boardWidget.blockBoardOnPop:
+                if self.boardWidget.turn == chess.WHITE:
+                    self.boardWidget.accessibleSides = hichess.ONLY_WHITE_SIDE
+                else:
+                    self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
+            else:
+                self.boardWidget.accessibleSides = hichess.BOTH_SIDES
+
     def setupGameScene(self):
         gameSceneWidget = QtWidgets.QWidget()
 
@@ -384,7 +400,6 @@ class HichessGui(QtWidgets.QMainWindow):
 
         self.boardWidget.blockBoardOnPop = False
         self.boardWidget.accessibleSides = hichess.BOTH_SIDES
-        self.controlPanelWidget.moveTable.setDisabled(True)
         self.stackedWidget.setCurrentIndex(1)
 
     @Slot()
@@ -437,7 +452,7 @@ class HichessGui(QtWidgets.QMainWindow):
             self.controlPanelWidget.addMove(move)
 
     def settings(self):
-        settingsDialog = dialogs.SettingsDialog(username=self.username, enginePath=self.enginePath, parent=self)
+        settingsDialog = dialogs.SettingsDialog(parent=self)
         status = settingsDialog.exec_()
 
         if status == dialogs.SettingsDialog.Accepted:

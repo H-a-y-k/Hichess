@@ -1,5 +1,5 @@
 from PySide2.QtWidgets import QApplication
-from PySide2.QtCore import QFile, QTextStream
+from PySide2.QtCore import QFile, QTextStream, QSettings, QStandardPaths
 from PySide2.QtGui import QFontDatabase, QIcon
 from hichess_gui import HichessGui
 from dialogs import SettingsDialog
@@ -14,14 +14,20 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     app = QApplication(sys.argv)
-    breeze = QFile(":qbreeze/dark.qss")
-    main = QFile(":/style/styles.css")
-
-    breezeQss = ""
-    mainQss = ""
 
     QFontDatabase.addApplicationFont(":/font/bahnschrift.ttf")
     app.setWindowIcon(QIcon(":/images/chessboard.png"))
+
+    app.setApplicationDisplayName("HiChess")
+    app.setOrganizationName("Zneigras")
+    app.setOrganizationDomain("https://github.com/H-a-y-k/Hichess")
+
+    breeze = QFile(":qbreeze/dark.qss")
+    main = QFile(":/style/styles.css")
+
+    # stylesheet as string
+    breezeQss = ""
+    mainQss = ""
 
     if breeze.open(QFile.ReadOnly):
         textstream = QTextStream(breeze)
@@ -32,7 +38,7 @@ if __name__ == "__main__":
 
     app.setStyleSheet(f"{breezeQss}{mainQss}")
 
-    settingsDialog = SettingsDialog("", "")
+    settingsDialog = SettingsDialog()
     status = settingsDialog.exec_()
 
     if status == SettingsDialog.Accepted:
