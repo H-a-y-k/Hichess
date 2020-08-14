@@ -54,6 +54,16 @@ class WaitDialog(QtWidgets.QDialog):
         self.setLayout(waitDialogLayout)
 
 
+class ConnectingDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(ConnectingDialog, self).__init__(parent)
+
+        layout = QtWidgets.QVBoxLayout()
+        connectingLabel = QtWidgets.QLabel("Connecting....")
+        layout.addWidget(connectingLabel)
+        self.setLayout(layout)
+
+
 class _ChooseVariantSection(QtWidgets.QGroupBox):
     variantSelected = Signal(str)
 
@@ -295,6 +305,8 @@ class SettingsDialog(QtWidgets.QDialog):
             self.engineEdit.pathEdit.clear()
             self.usernames.clear()
             self.engines.clear()
+            self.usernameLineEdit.setCompleter(QtWidgets.QCompleter())
+            self.engineEdit.pathEdit.setCompleter(QtWidgets.QCompleter())
             self.settings.clear()
             self._loadSettings()
 

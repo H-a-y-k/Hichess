@@ -80,8 +80,9 @@ class HichessGui(QtWidgets.QMainWindow):
         self.client.webClient.connected.connect(self.onClientConnected)
         self.client.gameStarted.connect(self.startGame)
         self.client.moveMade.connect(self.onClientMoveMade)
-        self.client.webClient.error.connect(lambda error: QtWidgets.QMessageBox.critical(self, "Server", str(error)))
+        self.client.webClient.error.connect(self._onError)
         self.waitDialog = dialogs.WaitDialog(self)
+        self.connectingDialog = dialogs.ConnectingDialog(self)
 
         self.chatWidget = chatwidget.ChatWidget()
 
@@ -184,13 +185,13 @@ class HichessGui(QtWidgets.QMainWindow):
     @Slot()
     def onClientConnected(self):
         self.client.gameStarted.connect(self.waitDialog.accept)
+        self.connectingDialog.close()
         self.waitDialog.exec_()
 
     @Slot()
     def onClientErrorReceived(self, error):
-        if error == QAbstractSocket.SocketTimeoutError or error == QAbstractSocket.ConnectionRefusedError:
-            QtWidgets.QMessageBox.critical(self, "Error", "Couldn't connect to the server")
-        elif error == QAbstractSocket.RemoteHostClosedError:
+        self.connectingDialog.close()
+        if error == QAbstractSocket.RemoteHostClosedError:
             self.boardWidget.accessibleSides = hichess.BOTH_SIDES
             self.boardWidget.blockBoardOnPop = False
             self.controlPanelWidget.moveTable.setDisabled(True)
@@ -339,7 +340,14 @@ class HichessGui(QtWidgets.QMainWindow):
             self.boardWidget.accessibleSides = hichess.NO_SIDE
         else:
             if self.boardWidget.blockBoardOnPop:
-                if self.boardWidget.turn == chess.WHITE:
+                if self.boardWidget.popStack:
+                    self.controlPanelWidget.toCurrentFenButton.setDisabled(False)
+                    self.controlPanelWidget.nextMoveButton.setDisabled(False)
+                if not self.boardWidget.popStack:
+                    self.controlPanelWidget.toCurrentFenButton.setDisabled(True)
+                    self.controlPanelWidget.nextMoveButton.setDisabled(True)
+
+                if self.boardWidget.board.turn == chess.WHITE:
                     self.boardWidget.accessibleSides = hichess.ONLY_WHITE_SIDE
                 else:
                     self.boardWidget.accessibleSides = hichess.ONLY_BLACK_SIDE
@@ -404,10 +412,9 @@ class HichessGui(QtWidgets.QMainWindow):
 
     @Slot()
     def playOnlinePvp(self):
-        if not dialogs.SettingsDialog.validator.validate(self.username, 0):
-            QtWidgets.QMessageBox.warning(self, "Server", "There's already a player with that username.")
         self.client.username = self.username
         self.client.startConnectionWithServer()
+        self.connectingDialog.exec_()
 
     @Slot()
     def startGame(self, packet: client.Packet):
@@ -450,6 +457,12 @@ class HichessGui(QtWidgets.QMainWindow):
         else:
             self.boardWidget.popStack.appendleft(chess.Move.from_uci(move))
             self.controlPanelWidget.addMove(move)
+
+    @Slot()
+    def _onError(self):
+        QtWidgets.QMessageBox.critical(self, "Server",
+                                       self.client.webClient.errorString())
+        self.waitDialog.close()
 
     def settings(self):
         settingsDialog = dialogs.SettingsDialog(parent=self)

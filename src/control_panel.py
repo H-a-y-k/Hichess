@@ -47,7 +47,7 @@ class GameControlPanel(QWidget):
         self.moveTable.setFocusPolicy(Qt.NoFocus)
         self.moveTable.setSelectionMode(QTableWidget.SingleSelection)
         self.moveTable.currentCellChanged.connect(self.onCurrentChanged)
-        self.moveTable.setFixedWidth(300)
+        self.moveTable.setFixedWidth(320)
         self.moveTable.setColumnCount(2)
         self.moveTable.horizontalHeader().hide()
 
