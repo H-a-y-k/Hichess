@@ -24,7 +24,7 @@ python src/main.py
 ### Tests
 - This project does not contain integrated unit tests. The main API it is based on is hichesslib, which is thoroughly tested.
 
-There is no need to contribute to this project, but contributions to hichesslib are welcome.
-
 ### License
  - GNU v3.0
+
+There is no need to contribute to this project, but contributions to hichesslib are welcome.
