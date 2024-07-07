@@ -10,6 +10,14 @@ This is only a fun project, with the purpose of illustrating hichesslib in actio
 
 ![image](https://github.com/H-a-y-k/Hichess/assets/52096477/e1b0a42c-b5c4-410e-abc0-3a0e49870738)
 
+### Dependencies
+ - hichesslib
+   + `pip install hichesslib`
+ - python-chess
+   + `pip install python-chess`
+ - numpy
+   + `pip install numpy`
+     
 ### How to run
 ```
 git clone https://github.com/H-a-y-k/Hichess
