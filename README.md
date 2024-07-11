@@ -35,4 +35,4 @@ python src/main.py
 ### License
  - GNU v3.0
 
-There is no need to contribute to this project, but contributions to hichesslib are welcome.
+To contribute you can inform me about bugs if you find any. Contributions to hichesslib are welcome.
