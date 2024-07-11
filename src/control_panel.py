@@ -1,13 +1,14 @@
 from PySide2.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton
 from PySide2.QtCore import Qt, Slot
-
+from PySide2.QtGui import QIcon
 
 class GameControlPanel(QWidget):
     def __init__(self, first: str, second: str, parent=None):
         super(GameControlPanel, self).__init__(parent)
 
         # buttons on the top
-        self.flipButton = QPushButton("*")
+        self.flipButton = QPushButton()
+        self.flipButton.setIcon(QIcon(":/images/flip.png"))
         self.toStartFenButton = QPushButton("<<")
         self.previousMoveButton = QPushButton("<")
         self.nextMoveButton = QPushButton(">")

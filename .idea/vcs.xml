@@ -2,8 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/QBreeze" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/QDarkStyleSheet" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/hichess" vcs="Git" />
   </component>
 </project>

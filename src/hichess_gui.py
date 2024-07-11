@@ -36,6 +36,7 @@ import chatwidget
 
 import pyperclip
 
+
 asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
 
 

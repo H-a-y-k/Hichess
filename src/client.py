@@ -1,6 +1,26 @@
+# -*- coding: utf-8 -*-
+#
+# This file is part of the HiChess project.
+# Copyright (C) 2019-2020 Haik Sargsian <haiksargsian6@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import PySide2.QtCore as QtCore
 import PySide2.QtWebSockets as QtWebSockets
 from PySide2.QtNetwork import QAbstractSocket
+
+import socket
 
 import logging
 from numpy import uint8, int64
@@ -60,7 +80,13 @@ class Client(QtCore.QObject):
         self.webClient.binaryMessageReceived.connect(self.processBinaryMessage)
 
     def startConnectionWithServer(self):
-        self.webClient.open(QtCore.QUrl.fromUserInput("ws://192.168.1.6:54545"))
+        # retrieve local ip
+        local_hostname = socket.gethostname()
+        ip_addresses = socket.gethostbyname_ex(local_hostname)[2]
+        filtered_ips = [ip for ip in ip_addresses if not ip.startswith("127.")]
+        ip = filtered_ips[:1][0]
+
+        self.webClient.open(QtCore.QUrl.fromUserInput(f"ws://{ip}:21166"))
 
     @QtCore.Slot()
     def authorize(self):
